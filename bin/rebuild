@@ -1,0 +1,10 @@
+#\!/bin/bash
+echo "Stopping any running servers..."
+lsof -t -i:5173 | xargs kill -9 2>/dev/null
+lsof -t -i:3000 | xargs kill -9 2>/dev/null
+echo "Cleaning built assets..."
+rm -rf app/assets/builds/*
+echo "Rebuilding assets..."
+yarn build
+echo "Starting servers with bin/dev..."
+bin/dev "$@"
