@@ -1,0 +1,21 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  token: MyString
+  resource_type: MyString
+  resource_id: 1
+  creator_id: 1
+  expires_at: 2025-03-09 21:07:14
+  permissions: 
+  max_uses: 1
+  use_count: 1
+
+two:
+  token: MyString
+  resource_type: MyString
+  resource_id: 1
+  creator_id: 1
+  expires_at: 2025-03-09 21:07:14
+  permissions: 
+  max_uses: 1
+  use_count: 1

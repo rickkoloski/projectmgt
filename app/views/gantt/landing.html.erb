@@ -1,0 +1,223 @@
+<div class="landing-page">
+  <header class="hero">
+    <div class="container">
+      <h1 class="hero-title">Project Management Tool</h1>
+      <p class="hero-subtitle">Powerful project and task management with secure sharing across organizations</p>
+      
+      <div class="cta-buttons">
+        <% if current_user %>
+          <%= link_to "Go to Dashboard", dashboard_path, class: "btn btn-primary" %>
+        <% else %>
+          <%= link_to "Sign Up", signup_path, class: "btn btn-primary" %>
+          <%= link_to "Log In", login_path, class: "btn btn-outline" %>
+        <% end %>
+      </div>
+    </div>
+  </header>
+  
+  <section class="features">
+    <div class="container">
+      <h2 class="section-title">Features</h2>
+      
+      <div class="feature-grid">
+        <div class="feature-card">
+          <h3>Secure Collaboration</h3>
+          <p>Share projects and tasks with internal and external users with fine-grained permissions</p>
+        </div>
+        
+        <div class="feature-card">
+          <h3>Task Dependencies</h3>
+          <p>Create task relationships and dependencies to organize your workflow</p>
+        </div>
+        
+        <div class="feature-card">
+          <h3>Gantt Chart</h3>
+          <p>Visualize your project timeline with an interactive Gantt chart</p>
+        </div>
+        
+        <div class="feature-card">
+          <h3>External Sharing</h3>
+          <p>Invite non-registered users to view and update tasks via secure links</p>
+        </div>
+      </div>
+    </div>
+  </section>
+  
+  <section class="how-it-works">
+    <div class="container">
+      <h2 class="section-title">How It Works</h2>
+      
+      <div class="steps">
+        <div class="step">
+          <span class="step-number">1</span>
+          <h3>Create Your Organization</h3>
+          <p>Set up your organization and invite team members</p>
+        </div>
+        
+        <div class="step">
+          <span class="step-number">2</span>
+          <h3>Add Projects</h3>
+          <p>Create projects to organize your work</p>
+        </div>
+        
+        <div class="step">
+          <span class="step-number">3</span>
+          <h3>Manage Tasks</h3>
+          <p>Add tasks, set dependencies, and assign to team members</p>
+        </div>
+        
+        <div class="step">
+          <span class="step-number">4</span>
+          <h3>Collaborate</h3>
+          <p>Share with team members or external partners</p>
+        </div>
+      </div>
+    </div>
+  </section>
+  
+  <footer class="site-footer">
+    <div class="container">
+      <p>&copy; <%= Date.today.year %> Project Management Tool</p>
+    </div>
+  </footer>
+</div>
+
+<style>
+  .landing-page {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    line-height: 1.6;
+    color: #333;
+  }
+  
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+  }
+  
+  .hero {
+    background: linear-gradient(135deg, #4f46e5, #6366f1);
+    color: white;
+    padding: 80px 0;
+    text-align: center;
+  }
+  
+  .hero-title {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+  }
+  
+  .hero-subtitle {
+    font-size: 1.5rem;
+    margin-bottom: 2rem;
+    opacity: 0.9;
+  }
+  
+  .cta-buttons {
+    margin-top: 2rem;
+  }
+  
+  .btn {
+    display: inline-block;
+    padding: 12px 24px;
+    border-radius: 6px;
+    font-weight: 600;
+    text-decoration: none;
+    margin: 0 10px;
+    transition: all 0.2s;
+  }
+  
+  .btn-primary {
+    background-color: #ffffff;
+    color: #4f46e5;
+  }
+  
+  .btn-primary:hover {
+    background-color: #f0f0f0;
+    transform: translateY(-2px);
+  }
+  
+  .btn-outline {
+    background-color: transparent;
+    color: #ffffff;
+    border: 2px solid #ffffff;
+  }
+  
+  .btn-outline:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    transform: translateY(-2px);
+  }
+  
+  .section-title {
+    text-align: center;
+    font-size: 2.5rem;
+    margin: 2rem 0;
+  }
+  
+  .features {
+    padding: 80px 0;
+    background-color: #f9fafb;
+  }
+  
+  .feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 30px;
+    margin-top: 3rem;
+  }
+  
+  .feature-card {
+    background-color: white;
+    border-radius: 8px;
+    padding: 30px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s;
+  }
+  
+  .feature-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+  }
+  
+  .feature-card h3 {
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+    color: #4f46e5;
+  }
+  
+  .how-it-works {
+    padding: 80px 0;
+  }
+  
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 30px;
+    margin-top: 3rem;
+  }
+  
+  .step {
+    text-align: center;
+    padding: 20px;
+  }
+  
+  .step-number {
+    display: inline-block;
+    width: 50px;
+    height: 50px;
+    background-color: #4f46e5;
+    color: white;
+    border-radius: 50%;
+    font-size: 1.5rem;
+    font-weight: bold;
+    line-height: 50px;
+    margin-bottom: 1rem;
+  }
+  
+  .site-footer {
+    background-color: #f3f4f6;
+    padding: 40px 0;
+    text-align: center;
+    margin-top: 40px;
+  }
+</style>

@@ -1,0 +1,23 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  recipient_email: MyString
+  recipient_name: MyString
+  subject: MyString
+  content: MyText
+  task: one
+  status: MyString
+  notification_type: MyString
+  sent_at: 2025-03-09 21:07:21
+  read_at: 2025-03-09 21:07:21
+
+two:
+  recipient_email: MyString
+  recipient_name: MyString
+  subject: MyString
+  content: MyText
+  task: two
+  status: MyString
+  notification_type: MyString
+  sent_at: 2025-03-09 21:07:21
+  read_at: 2025-03-09 21:07:21

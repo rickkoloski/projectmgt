@@ -1,0 +1,16 @@
+<div id="app">
+  <app :initial-data="<%= @gantt_data.to_json %>"></app>
+</div>
+
+<%= content_for :head do %>
+  <script>
+    window.ganttData = <%= @gantt_data.to_json.html_safe %>;
+  </script>
+<% end %>
+
+<style>
+  #app {
+    height: 100vh;
+    width: 100%;
+  }
+</style>
