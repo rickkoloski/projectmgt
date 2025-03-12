@@ -4,6 +4,7 @@
     :style="barStyle"
     :class="{ 'is-dragging': isDragging, 'summary-task-bar': isSummaryTask }"
     :data-task-id="task.id"
+    @contextmenu.prevent="showContextMenu"
   >
     <div 
       class="task-bar-content"
@@ -51,6 +52,19 @@
       <path :d="connectionPath" class="connection-line-path"></path>
     </svg>
   </div>
+  
+  <!-- Context Menu - Rendered at document level to ensure it's on top of everything -->
+  <teleport to="body" v-if="showMenu">
+    <div 
+      class="task-context-menu"
+      :style="{ top: menuPosition.y + 'px', left: menuPosition.x + 'px' }"
+    >
+      <div class="menu-item" @click="handleMenuAction('edit')">Edit Task</div>
+      <div class="menu-item" @click="handleMenuAction('delete')">Delete Task</div>
+      <div class="menu-item" @click="handleMenuAction('addDependency')">Add Dependency</div>
+      <div class="menu-item" @click="handleMenuAction('markComplete')">Mark as Complete</div>
+    </div>
+  </teleport>
 </template>
 
 <script>
@@ -86,7 +100,11 @@ export default {
       connectionType: null, // 'start' or 'end'
       connectionPoint: { x: 0, y: 0 },
       currentMousePosition: { x: 0, y: 0 },
-      isConnectionPointActive: false
+      isConnectionPointActive: false,
+      
+      // Context menu properties
+      showMenu: false,
+      menuPosition: { x: 0, y: 0 }
     }
   },
   computed: {
@@ -297,6 +315,59 @@ export default {
     // Method to highlight this connection point when another connection is being dragged over it
     setConnectionPointActive(isActive) {
       this.isConnectionPointActive = isActive;
+    },
+    
+    // Context menu methods
+    showContextMenu(e) {
+      // Prevent default browser context menu
+      e.preventDefault();
+      
+      // Close all existing context menus first by dispatching a custom event
+      document.dispatchEvent(new CustomEvent('closeAllContextMenus'));
+      
+      // Position the menu at mouse coordinates
+      this.menuPosition = {
+        x: e.clientX,
+        y: e.clientY
+      };
+      
+      // Show the menu
+      this.showMenu = true;
+      
+      // Add event listeners to close menu when clicking outside or when another menu is opened
+      document.addEventListener('click', this.hideContextMenu);
+      document.addEventListener('closeAllContextMenus', this.hideContextMenu);
+    },
+    
+    hideContextMenu() {
+      this.showMenu = false;
+      document.removeEventListener('click', this.hideContextMenu);
+      document.removeEventListener('closeAllContextMenus', this.hideContextMenu);
+    },
+    
+    handleMenuAction(action) {
+      // Hide the menu first
+      this.hideContextMenu();
+      
+      // Show alert with the selected action
+      alert(`${action} Selected`);
+      
+      // Here you would handle the actual actions
+      // For example:
+      switch (action) {
+        case 'edit':
+          // Handle edit task
+          break;
+        case 'delete':
+          // Handle delete task
+          break;
+        case 'addDependency':
+          // Handle add dependency
+          break;
+        case 'markComplete':
+          // Handle mark as complete
+          break;
+      }
     }
   }
 }
@@ -488,5 +559,31 @@ export default {
   stroke: #4a90e2;
   stroke-width: 2px;
   stroke-dasharray: 4 2;
+}
+
+/* Context Menu Styles */
+.task-context-menu {
+  position: fixed;
+  min-width: 150px;
+  background-color: white;
+  border-radius: 4px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+  z-index: 9999; /* Significantly increased z-index to appear in front of everything */
+  overflow: hidden;
+}
+
+.menu-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 14px;
+  user-select: none;
+}
+
+.menu-item:hover {
+  background-color: #f5f5f5;
+}
+
+.menu-item + .menu-item {
+  border-top: 1px solid #eee;
 }
 </style>

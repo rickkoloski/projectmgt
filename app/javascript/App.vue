@@ -11,7 +11,7 @@
           </svg>
         </div>
         <div class="build-info">
-          <span class="build-number">Build #20250305.16</span>
+          <span class="build-number">Build #20250312.05</span>
         </div>
         <div class="app-switcher">
           <!-- App Switcher Icon - Google style dots -->
@@ -254,10 +254,37 @@
       :style="aiChatDockPosition === 'free' ? { 
         top: aiChatPanelPosition.top + 'px', 
         left: aiChatPanelPosition.left + 'px',
-        width: '400px',
-        height: '500px'
+        width: aiChatPanelSize.width + 'px',
+        height: aiChatPanelSize.height + 'px'
       } : {}"
     >
+      <!-- Resize handles based on dock position -->
+      <!-- Free mode (all handles) -->
+      <template v-if="aiChatDockPosition === 'free'">
+        <div class="resize-handle resize-e" @mousedown.prevent="startResize($event, 'right')"></div>
+        <div class="resize-handle resize-s" @mousedown.prevent="startResize($event, 'bottom')"></div>
+        <div class="resize-handle resize-se" @mousedown.prevent="startResize($event, 'corner')"></div>
+      </template>
+      
+      <!-- North dock (can resize bottom) -->
+      <template v-if="aiChatDockPosition === 'north'">
+        <div class="resize-handle resize-s" @mousedown.prevent="startResize($event, 'bottom')"></div>
+      </template>
+      
+      <!-- South dock (can resize top) -->
+      <template v-if="aiChatDockPosition === 'south'">
+        <div class="resize-handle resize-n" @mousedown.prevent="startResize($event, 'top')"></div>
+      </template>
+      
+      <!-- East dock (can resize left) -->
+      <template v-if="aiChatDockPosition === 'east'">
+        <div class="resize-handle resize-w" @mousedown.prevent="startResize($event, 'left')"></div>
+      </template>
+      
+      <!-- West dock (can resize right) -->
+      <template v-if="aiChatDockPosition === 'west'">
+        <div class="resize-handle resize-e" @mousedown.prevent="startResize($event, 'right')"></div>
+      </template>
       <div 
         class="ai-chat-panel-header"
         @mousedown="startDragAIChatPanel"
@@ -369,10 +396,6 @@
       </div>
     </div>
     
-    <!-- Red indicator when chat is expanded -->
-    <div style="position: fixed; top: 10px; left: 10px; background: red; color: white; padding: 5px; z-index: 10000000; font-size: 12px;" v-if="aiChatExpanded">
-      AI CHAT IS OPEN
-    </div>
   </div>
 </template>
 
@@ -414,7 +437,15 @@ export default {
         top: 100,
         left: 100
       },
+      aiChatPanelSize: {
+        width: 400,
+        height: 500
+      },
       isDraggingAIChatPanel: false,
+      isResizing: false,
+      resizeType: null,
+      resizeStartPos: { x: 0, y: 0 },
+      resizeStartSize: { width: 0, height: 0 },
       aiChatPanelDragStart: { x: 0, y: 0 },
       aiChatPanelDragInitialPosition: { top: 0, left: 0 },
       aiChatDockPosition: 'free', // Possible values: 'free', 'north', 'south', 'east', 'west'
@@ -1180,22 +1211,159 @@ export default {
     },
     
     dockAIChat(position) {
+      const previousPosition = this.aiChatDockPosition;
+      
       // Update the dock position
       this.aiChatDockPosition = position;
       
-      // If in free mode, we can adjust its initial position
-      if (position === 'free') {
-        // Set to center of screen if currently docked
-        if (this.aiChatDockPosition !== 'free') {
-          const windowWidth = window.innerWidth;
-          const windowHeight = window.innerHeight;
-          
-          this.aiChatPanelPosition = {
-            top: (windowHeight - 500) / 2,
-            left: (windowWidth - 400) / 2
-          };
+      // Set appropriate dimensions based on dock position
+      const windowWidth = window.innerWidth;
+      const windowHeight = window.innerHeight;
+      
+      // Set default sizes for each dock position if coming from a different position
+      if (previousPosition !== position) {
+        switch (position) {
+          case 'north':
+          case 'south':
+            // For top/bottom docking, set height to 300px (or 30% of screen) and width to full screen
+            this.aiChatPanelSize.height = Math.min(300, Math.floor(windowHeight * 0.3));
+            break;
+            
+          case 'east':
+          case 'west':
+            // For left/right docking, set width to 350px (or 30% of screen) and height to full screen
+            this.aiChatPanelSize.width = Math.min(350, Math.floor(windowWidth * 0.3));
+            break;
+            
+          case 'free':
+            // Set to center of screen if currently docked
+            this.aiChatPanelPosition = {
+              top: (windowHeight - this.aiChatPanelSize.height) / 2,
+              left: (windowWidth - this.aiChatPanelSize.width) / 2
+            };
+            
+            // Reset to default size if coming from docked
+            if (previousPosition !== 'free') {
+              this.aiChatPanelSize = {
+                width: 400,
+                height: 500
+              };
+            }
+            break;
         }
       }
+    },
+    
+    // Resize methods for the AI Chat panel
+    startResize(e, type) {
+      // Prevent default and stop propagation to avoid conflicts
+      e.preventDefault();
+      e.stopPropagation();
+      
+      // Store start values
+      this.isResizing = true;
+      this.resizeType = type;
+      this.resizeStartPos = { x: e.clientX, y: e.clientY };
+      this.resizeStartSize = { 
+        width: this.aiChatPanelSize.width, 
+        height: this.aiChatPanelSize.height 
+      };
+      
+      // Add event listeners
+      document.addEventListener('mousemove', this.onResize);
+      document.addEventListener('mouseup', this.stopResize);
+      
+      // Add visual indication
+      document.body.classList.add('resizing');
+      
+      // Set cursor for the whole document based on resize type
+      switch (type) {
+        case 'right':
+        case 'left':
+          document.body.style.cursor = 'ew-resize';
+          break;
+        case 'top':
+        case 'bottom':
+          document.body.style.cursor = 'ns-resize';
+          break;
+        case 'corner':
+          document.body.style.cursor = 'se-resize';
+          break;
+      }
+    },
+    
+    onResize(e) {
+      if (!this.isResizing) return;
+      
+      const dx = e.clientX - this.resizeStartPos.x;
+      const dy = e.clientY - this.resizeStartPos.y;
+      
+      // Minimum dimensions
+      const MIN_WIDTH = 300;
+      const MIN_HEIGHT = 200;
+      
+      // Maximum dimensions (for window boundaries)
+      const MAX_WIDTH = window.innerWidth;
+      const MAX_HEIGHT = window.innerHeight;
+      
+      // Apply resizing based on handle type
+      switch (this.resizeType) {
+        case 'right':
+          const newWidth = this.resizeStartSize.width + dx;
+          if (newWidth >= MIN_WIDTH && newWidth <= MAX_WIDTH) {
+            this.aiChatPanelSize.width = newWidth;
+          }
+          break;
+          
+        case 'left':
+          const newLeftWidth = this.resizeStartSize.width - dx;
+          if (newLeftWidth >= MIN_WIDTH && newLeftWidth <= MAX_WIDTH) {
+            this.aiChatPanelSize.width = newLeftWidth;
+          }
+          break;
+          
+        case 'bottom':
+          const newHeight = this.resizeStartSize.height + dy;
+          if (newHeight >= MIN_HEIGHT && newHeight <= MAX_HEIGHT) {
+            this.aiChatPanelSize.height = newHeight;
+          }
+          break;
+          
+        case 'top':
+          const newTopHeight = this.resizeStartSize.height - dy;
+          if (newTopHeight >= MIN_HEIGHT && newTopHeight <= MAX_HEIGHT) {
+            this.aiChatPanelSize.height = newTopHeight;
+          }
+          break;
+          
+        case 'corner':
+          // Resize both width and height
+          const cornerWidth = this.resizeStartSize.width + dx;
+          const cornerHeight = this.resizeStartSize.height + dy;
+          
+          if (cornerWidth >= MIN_WIDTH && cornerWidth <= MAX_WIDTH) {
+            this.aiChatPanelSize.width = cornerWidth;
+          }
+          
+          if (cornerHeight >= MIN_HEIGHT && cornerHeight <= MAX_HEIGHT) {
+            this.aiChatPanelSize.height = cornerHeight;
+          }
+          break;
+      }
+    },
+    
+    stopResize() {
+      if (!this.isResizing) return;
+      
+      // Clean up
+      this.isResizing = false;
+      this.resizeType = null;
+      document.removeEventListener('mousemove', this.onResize);
+      document.removeEventListener('mouseup', this.stopResize);
+      
+      // Remove visual indication
+      document.body.classList.remove('resizing');
+      document.body.style.cursor = '';
     },
     
     forceUpdate() {
@@ -1769,6 +1937,82 @@ body {
   width: 350px;
   height: 100%;
   border-radius: 0 10px 10px 0;
+}
+
+/* Custom sizing for docked panels */
+.ai-chat-panel.dock-north, 
+.ai-chat-panel.dock-south {
+  height: v-bind('aiChatPanelSize.height + "px"');
+}
+
+.ai-chat-panel.dock-east, 
+.ai-chat-panel.dock-west {
+  width: v-bind('aiChatPanelSize.width + "px"');
+}
+
+/* Resize handles */
+.resize-handle {
+  position: absolute;
+  z-index: 999;
+  background-color: rgba(102, 153, 204, 0.1); /* #6699CC with transparency */
+  transition: background-color 0.2s ease;
+}
+
+.resize-handle.resize-e {
+  width: 8px;
+  height: 100%; 
+  top: 0;
+  right: -4px;
+  cursor: e-resize;
+}
+
+.resize-handle.resize-w {
+  width: 8px;
+  height: 100%;
+  top: 0;
+  left: -4px;
+  cursor: w-resize;
+}
+
+.resize-handle.resize-s {
+  width: 100%;
+  height: 8px;
+  bottom: -4px;
+  left: 0;
+  cursor: s-resize;
+}
+
+.resize-handle.resize-n {
+  width: 100%;
+  height: 8px;
+  top: -4px;
+  left: 0;
+  cursor: n-resize;
+}
+
+.resize-handle.resize-se {
+  width: 16px;
+  height: 16px;
+  bottom: -8px;
+  right: -8px;
+  cursor: se-resize;
+  border-radius: 0 0 8px 0;
+  background-color: rgba(102, 153, 204, 0.2); /* Slightly more visible */
+}
+
+.resize-handle:hover {
+  background-color: rgba(102, 153, 204, 0.4); /* More visible on hover */
+}
+
+body.resizing {
+  cursor: auto !important;
+  user-select: none;
+}
+
+/* Add subtle highlight during resize */
+body.resizing .ai-chat-panel {
+  box-shadow: 0 0 15px rgba(102, 153, 204, 0.4);
+  border-color: #6699CC;
 }
 
 .ai-chat-panel-header {
