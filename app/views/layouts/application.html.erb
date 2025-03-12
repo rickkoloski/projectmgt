@@ -18,7 +18,7 @@
     <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
     
     <%# Include Vue app - full app for dashboard, AI chat only for other pages %>
-    <% if controller_name == 'gantt' && current_user.present? %>
+    <% if (controller_name == 'gantt' || controller_name == 'dashboard') && current_user.present? %>
       <%# Full Vue app for dashboard %>
       <%= javascript_include_tag "application", defer: true %>
     <% elsif current_user.present? %>
@@ -47,14 +47,20 @@
   </head>
 
   <body class="<%= controller_name.in?(['sessions', 'users']) || (controller_name == 'gantt' && !current_user.present?) ? 'allow-scroll' : '' %>">
-    <% if controller_name == 'gantt' && current_user.present? %>
-      <%# For app dashboard, include the complete Vue app %>
+    <% if (controller_name == 'gantt' && action_name == 'dashboard') && current_user.present? %>
+      <%# For gantt dashboard, include the complete Vue app %>
       <div id="main-app">
         <%# This will be replaced by Vue, but ensures the logout button is available before Vue loads %>
         <div id="fallback-header" style="display: flex; justify-content: flex-end; padding: 10px 20px; background-color: #fff; border-bottom: 1px solid #e1e4e8;">
           <%= button_to "Logout", logout_path, method: :delete, class: "logout-button", style: "background-color: #6699CC; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;" %>
         </div>
       </div>
+      <%= yield %>
+    <% elsif controller_name == 'dashboard' && current_user.present? %>
+      <%# For new project dashboard, just yield the content %>
+      <header style="display: flex; justify-content: flex-end; padding: 10px 20px; background-color: #fff; border-bottom: 1px solid #e1e4e8;">
+        <%= button_to "Logout", logout_path, method: :delete, class: "logout-button", style: "background-color: #6699CC; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;" %>
+      </header>
       <%= yield %>
     <% else %>
       <%# For all other pages, show regular content with AI chat %>

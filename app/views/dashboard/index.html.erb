@@ -1,0 +1,955 @@
+<div class="dashboard-container">
+  <header class="dashboard-header">
+    <h1>Welcome to Harmoniq</h1>
+    <p class="tagline">Orchestrating distributed collaborations through harmonized workstreams</p>
+  </header>
+
+  <div class="dashboard-content">
+    <!-- AI Assistant Panel (Standard div above project list) -->
+    <div class="ai-assistant-panel">
+      <div class="ai-assistant-header">
+        <h3>AI Assistant</h3>
+        <button type="button" class="ai-toggle-btn">
+          <span class="icon-collapse">↑</span>
+          <span class="icon-expand">↓</span>
+        </button>
+      </div>
+      <div class="ai-assistant-content">
+        <div class="chat-messages">
+          <div class="message ai-message">
+            <div class="message-avatar">H</div>
+            <div class="message-content">
+              <p>Hello! I'm your Harmoniq assistant. How can I help you with your projects today?</p>
+            </div>
+          </div>
+        </div>
+        <div class="chat-input">
+          <textarea placeholder="Ask me anything about your projects..." rows="1"></textarea>
+          <button type="button" class="btn-send">Send</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="main-sections">
+      <div class="projects-section">
+        <div class="section-header">
+          <h2>Your Projects</h2>
+          <button id="showCreateProjectModal" class="btn-primary">New Project</button>
+        </div>
+
+        <div class="projects-grid">
+          <% if @projects.any? %>
+            <% @projects.each do |project| %>
+              <div class="project-card">
+                <div class="project-header">
+                  <h3><%= project.name %></h3>
+                  <span class="project-status badge-<%= project.status %>"><%= project.status.humanize %></span>
+                </div>
+                <div class="project-stats">
+                  <div class="stat-item">
+                    <span class="stat-label">Tasks</span>
+                    <span class="stat-value"><%= project.tasks.count %></span>
+                  </div>
+                  <div class="stat-item">
+                    <span class="stat-label">Progress</span>
+                    <div class="progress-bar">
+                      <% 
+                      status_to_check = project.tasks.where(status: 'completed').count > 0 ? 'completed' : 'done'
+                      completed_percent = project.tasks.count > 0 ? 
+                        (project.tasks.where(status: status_to_check).count.to_f / project.tasks.count * 100).round : 0 
+                      %>
+                      <div class="progress-fill" style="width: <%= completed_percent %>%"></div>
+                      <span class="progress-text"><%= completed_percent %>%</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="project-dates">
+                  <% if project.start_date && project.end_date %>
+                    <span>
+                      <%= project.start_date.strftime("%b %d") %> - <%= project.end_date.strftime("%b %d, %Y") %>
+                    </span>
+                  <% end %>
+                </div>
+                <div class="project-actions">
+                  <a href="<%= project_path(project) %>" class="btn-view">View Project</a>
+                </div>
+              </div>
+            <% end %>
+          <% else %>
+            <div class="no-projects">
+              <p>You don't have any projects yet. Get started by creating a new project from a template.</p>
+            </div>
+          <% end %>
+        </div>
+      </div>
+
+      <div class="templates-section">
+        <div class="section-header">
+          <h2>Project Templates</h2>
+          <p>Create a new project using one of our templates</p>
+        </div>
+
+        <div class="templates-grid">
+          <% @project_templates.each do |template| %>
+            <div class="template-card" data-template-id="<%= template[:id] %>">
+              <div class="template-icon"><%= template[:icon] %></div>
+              <h3><%= template[:name] %></h3>
+              <p><%= template[:description] %></p>
+              <button class="btn-use-template" data-template-id="<%= template[:id] %>">Use Template</button>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create Project Modal -->
+  <div id="createProjectModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Create New Project</h2>
+        <button type="button" class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <%= form_with url: create_from_template_path, method: :post, id: "createProjectForm" do |form| %>
+          <%= form.hidden_field :template_id %>
+          
+          <div class="form-group">
+            <%= form.label :project_name, "Project Name" %>
+            <%= form.text_field :project_name, required: true, class: "form-control", placeholder: "Enter project name" %>
+          </div>
+          
+          <div class="form-group">
+            <h3>Selected Template:</h3>
+            <div id="selectedTemplateName"></div>
+            <div id="selectedTemplateDescription" class="template-description"></div>
+          </div>
+          
+          <div class="form-actions">
+            <button type="button" class="btn-cancel">Cancel</button>
+            <%= form.submit "Create Project", class: "btn-primary" %>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<style>
+  /* Dashboard Layout */
+  .dashboard-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 10px 20px;
+    font-family: Avenir, Helvetica, Arial, sans-serif;
+  }
+  
+  .dashboard-header {
+    text-align: center;
+    margin-bottom: 20px;  /* Reduced from 40px */
+  }
+  
+  .dashboard-header h1 {
+    color: #6699CC;
+    font-size: 28px;  /* Reduced from 32px */
+    margin-bottom: 5px;
+  }
+  
+  .tagline {
+    color: #666;
+    font-size: 14px;  /* Reduced from 16px */
+    margin-top: 0;
+  }
+  
+  .dashboard-content {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;  /* Reduced from 40px */
+  }
+  
+  /* Section Styling */
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;  /* Reduced from 20px */
+  }
+  
+  .section-header h2 {
+    color: #333;
+    font-size: 20px;  /* Reduced from 24px */
+    margin: 0;
+  }
+  
+  /* Main Sections Layout */
+  .main-sections {
+    display: grid;
+    grid-template-columns: 2fr 1fr;  /* 2/3 for projects, 1/3 for templates */
+    gap: 20px;
+  }
+  
+  /* Projects Grid */
+  .projects-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));  /* Slightly smaller cards */
+    gap: 15px;  /* Reduced from 20px */
+  }
+  
+  .project-card {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    padding: 15px;  /* Reduced from 20px */
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  
+  .project-card:hover {
+    transform: translateY(-3px);  /* Less dramatic lift */
+    box-shadow: 0 3px 10px rgba(0,0,0,0.15);
+  }
+  
+  .project-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;  /* Reduced from 15px */
+  }
+  
+  .project-header h3 {
+    margin: 0;
+    font-size: 16px;  /* Reduced from 18px */
+    color: #333;
+  }
+  
+  .project-status {
+    padding: 2px 6px;  /* Reduced padding */
+    border-radius: 10px;
+    font-size: 11px;  /* Reduced from 12px */
+    font-weight: 500;
+    text-transform: uppercase;
+  }
+  
+  .badge-active { background: #e6f7ed; color: #2e7d32; }
+  .badge-on_hold { background: #fff8e1; color: #ff8f00; }
+  .badge-completed { background: #e3f2fd; color: #0277bd; }
+  .badge-archived { background: #f5f5f5; color: #757575; }
+  .badge-planning { background: #f0f4ff; color: #3366cc; }
+  .badge-not_started { background: #f0f4ff; color: #3366cc; }
+  .badge-in_progress { background: #e6f7ed; color: #2e7d32; }
+  .badge-cancelled { background: #fae9e9; color: #d32f2f; }
+  
+  .project-stats {
+    margin-bottom: 10px;  /* Reduced from 15px */
+  }
+  
+  .stat-item {
+    margin-bottom: 6px;  /* Reduced from 8px */
+  }
+  
+  .stat-label {
+    font-size: 12px;  /* Reduced from 14px */
+    color: #666;
+    display: block;
+    margin-bottom: 2px;  /* Reduced from 3px */
+  }
+  
+  .stat-value {
+    font-weight: 500;
+    color: #333;
+    font-size: 13px;  /* Added smaller font size */
+  }
+  
+  .progress-bar {
+    height: 6px;  /* Reduced from 8px */
+    background: #eee;
+    border-radius: 3px;
+    overflow: hidden;
+    position: relative;
+  }
+  
+  .progress-fill {
+    height: 100%;
+    background: #6699CC;
+    border-radius: 3px;
+  }
+  
+  .progress-text {
+    position: absolute;
+    right: 5px;
+    top: -5px;
+    font-size: 11px;  /* Reduced from 12px */
+    color: #555;
+  }
+  
+  .project-dates {
+    font-size: 12px;  /* Reduced from 13px */
+    color: #666;
+    margin-bottom: 10px;  /* Reduced from 15px */
+  }
+  
+  .project-actions {
+    margin-top: 10px;  /* Reduced from 15px */
+  }
+  
+  .btn-view {
+    display: inline-block;
+    padding: 6px 12px;  /* Reduced from 8px 15px */
+    background: #6699CC;
+    color: white;
+    border-radius: 4px;
+    text-decoration: none;
+    font-size: 13px;  /* Reduced from 14px */
+    transition: background 0.2s;
+  }
+  
+  .btn-view:hover {
+    background: #5588bb;
+  }
+  
+  .no-projects {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 20px;  /* Reduced from 40px */
+    background: #f9f9f9;
+    border-radius: 8px;
+    color: #666;
+    font-size: 14px;  /* Added smaller font */
+  }
+  
+  /* Templates Section */
+  .templates-section {
+    overflow-y: auto;
+    max-height: 100vh;  /* Allow templates to scroll if needed */
+  }
+  
+  .templates-grid {
+    display: grid;
+    grid-template-columns: 1fr;  /* Single column for templates */
+    gap: 15px;  /* Reduced from 20px */
+  }
+  
+  .template-card {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    padding: 15px;  /* Reduced from 20px */
+    transition: transform 0.2s, box-shadow 0.2s;
+    text-align: center;
+  }
+  
+  .template-card:hover {
+    transform: translateY(-3px);  /* Less dramatic lift */
+    box-shadow: 0 3px 10px rgba(0,0,0,0.15);
+    border: 1px solid #e0e0e0;
+  }
+  
+  .template-icon {
+    font-size: 36px;  /* Reduced from 48px */
+    margin-bottom: 10px;  /* Reduced from 15px */
+  }
+  
+  .template-card h3 {
+    margin: 0 0 8px 0;  /* Reduced from 10px */
+    color: #333;
+    font-size: 16px;  /* Added smaller font */
+  }
+  
+  .template-card p {
+    color: #666;
+    font-size: 13px;  /* Reduced from 14px */
+    margin-bottom: 15px;  /* Reduced from 20px */
+  }
+  
+  .btn-use-template {
+    background: #f5f5f5;
+    border: 1px solid #ddd;
+    padding: 6px 12px;  /* Reduced from 8px 15px */
+    border-radius: 4px;
+    color: #333;
+    font-size: 13px;  /* Reduced from 14px */
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .btn-use-template:hover {
+    background: #6699CC;
+    color: white;
+    border-color: #6699CC;
+  }
+  
+  /* AI Assistant Panel */
+  .ai-assistant-panel {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    overflow: hidden;
+    margin-bottom: 15px;
+  }
+  
+  .ai-assistant-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 15px;
+    background: #6699CC;
+    color: white;
+    cursor: pointer;
+  }
+  
+  .ai-assistant-header h3 {
+    margin: 0;
+    font-size: 16px;
+  }
+  
+  .ai-toggle-btn {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .ai-assistant-content {
+    display: flex;
+    flex-direction: column;
+    height: 180px; /* Fixed height for compact layout */
+  }
+  
+  .ai-assistant-panel.collapsed .ai-assistant-content {
+    display: none;
+  }
+  
+  .ai-assistant-panel.collapsed .icon-expand {
+    display: block;
+  }
+  
+  .ai-assistant-panel.collapsed .icon-collapse {
+    display: none;
+  }
+  
+  .ai-assistant-panel:not(.collapsed) .icon-expand {
+    display: none;
+  }
+  
+  .ai-assistant-panel:not(.collapsed) .icon-collapse {
+    display: block;
+  }
+  
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px;
+    background: #f5f5f5;
+  }
+  
+  .message {
+    display: flex;
+    margin-bottom: 10px;
+    font-size: 14px;
+  }
+  
+  .ai-message {
+    align-items: flex-start;
+  }
+  
+  .user-message {
+    flex-direction: row-reverse;
+  }
+  
+  .message-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #6699CC;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    margin-right: 8px;
+    font-size: 14px;
+  }
+  
+  .user-message .message-avatar {
+    background: #4CAF50;
+    margin-left: 8px;
+    margin-right: 0;
+  }
+  
+  .message-content {
+    background: white;
+    padding: 8px 10px;
+    border-radius: 8px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    max-width: 80%;
+  }
+  
+  .user-message .message-content {
+    background: #e7f5e8;
+  }
+  
+  .message-content p {
+    margin: 0;
+    line-height: 1.4;
+  }
+  
+  .chat-input {
+    display: flex;
+    padding: 8px;
+    background: white;
+    border-top: 1px solid #eee;
+  }
+  
+  .chat-input textarea {
+    flex: 1;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 6px 8px;
+    font-size: 14px;
+    resize: none;
+    height: 30px;
+    margin-right: 8px;
+  }
+  
+  .btn-send {
+    background: #6699CC;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  
+  /* Buttons */
+  .btn-primary {
+    background: #6699CC;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  
+  .btn-primary:hover {
+    background: #5588bb;
+  }
+  
+  /* Modal Styles */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+  }
+  
+  .modal-content {
+    background: white;
+    border-radius: 8px;
+    width: 500px;
+    max-width: 90%;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    overflow: hidden;
+  }
+  
+  .modal-header {
+    padding: 15px 20px;
+    background: #f5f5f5;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #eee;
+  }
+  
+  .modal-header h2 {
+    margin: 0;
+    font-size: 20px;
+    color: #333;
+  }
+  
+  .modal-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    line-height: 1;
+    cursor: pointer;
+    color: #666;
+  }
+  
+  .modal-body {
+    padding: 20px;
+  }
+  
+  .form-group {
+    margin-bottom: 20px;
+  }
+  
+  .form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+    color: #333;
+  }
+  
+  .form-control {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 16px;
+  }
+  
+  .form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+  }
+  
+  .btn-cancel {
+    background: #f5f5f5;
+    border: 1px solid #ddd;
+    padding: 8px 15px;
+    border-radius: 4px;
+    color: #333;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  
+  .template-description {
+    margin-top: 10px;
+    padding: 10px;
+    background: #f9f9f9;
+    border-radius: 4px;
+    font-size: 14px;
+    color: #666;
+  }
+  
+  /* AI Assistant */
+  .ai-assistant-container {
+    position: fixed;
+    bottom: 0;
+    right: 20px;
+    width: 350px;
+    background: white;
+    border-radius: 8px 8px 0 0;
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+    z-index: 100;
+    overflow: hidden;
+    transition: height 0.3s ease;
+  }
+  
+  .ai-assistant-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 15px;
+    background: #6699CC;
+    color: white;
+    cursor: pointer;
+  }
+  
+  .ai-assistant-header h3 {
+    margin: 0;
+    font-size: 16px;
+  }
+  
+  .ai-toggle-btn {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    font-size: 18px;
+  }
+  
+  .ai-assistant-body {
+    height: 350px;
+    display: flex;
+    flex-direction: column;
+    transition: height 0.3s ease;
+  }
+  
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 15px;
+    background: #f5f5f5;
+  }
+  
+  .message {
+    display: flex;
+    margin-bottom: 15px;
+  }
+  
+  .ai-message {
+    align-items: flex-start;
+  }
+  
+  .user-message {
+    flex-direction: row-reverse;
+  }
+  
+  .message-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #6699CC;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    margin-right: 8px;
+  }
+  
+  .user-message .message-avatar {
+    background: #4CAF50;
+    margin-left: 8px;
+    margin-right: 0;
+  }
+  
+  .message-content {
+    background: white;
+    padding: 10px;
+    border-radius: 8px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    max-width: 80%;
+  }
+  
+  .user-message .message-content {
+    background: #e7f5e8;
+  }
+  
+  .message-content p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.4;
+  }
+  
+  .chat-input {
+    display: flex;
+    padding: 10px;
+    background: white;
+    border-top: 1px solid #eee;
+  }
+  
+  .chat-input textarea {
+    flex: 1;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 8px;
+    font-size: 14px;
+    resize: none;
+    height: 40px;
+    margin-right: 8px;
+  }
+  
+  .btn-send {
+    background: #6699CC;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 15px;
+    cursor: pointer;
+  }
+  
+  .ai-assistant-container.collapsed .ai-assistant-body {
+    display: none;
+  }
+  
+  .ai-assistant-container.collapsed .icon-close {
+    display: none;
+  }
+  
+  .ai-assistant-container:not(.collapsed) .icon-open {
+    display: none;
+  }
+  
+  @media (max-width: 768px) {
+    .dashboard-content {
+      grid-template-columns: 1fr;
+    }
+    
+    .ai-assistant-container {
+      width: 100%;
+      right: 0;
+    }
+  }
+</style>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    // Modal handling
+    const modal = document.getElementById('createProjectModal');
+    const showModalBtn = document.getElementById('showCreateProjectModal');
+    const closeModalBtn = document.querySelector('.modal-close');
+    const cancelBtn = document.querySelector('.btn-cancel');
+    const templateForm = document.getElementById('createProjectForm');
+    const templateIdField = document.querySelector('input[name="template_id"]');
+    const selectedTemplateName = document.getElementById('selectedTemplateName');
+    const selectedTemplateDesc = document.getElementById('selectedTemplateDescription');
+    
+    // Template buttons
+    const templateButtons = document.querySelectorAll('.btn-use-template');
+    
+    // Show modal when "New Project" button is clicked
+    showModalBtn.addEventListener('click', function() {
+      modal.style.display = 'flex';
+    });
+    
+    // Close modal functions
+    function closeModal() {
+      modal.style.display = 'none';
+    }
+    
+    closeModalBtn.addEventListener('click', closeModal);
+    cancelBtn.addEventListener('click', closeModal);
+    
+    // Close modal when clicking outside
+    modal.addEventListener('click', function(e) {
+      if (e.target === modal) {
+        closeModal();
+      }
+    });
+    
+    // Handle template selection
+    templateButtons.forEach(button => {
+      button.addEventListener('click', function() {
+        const templateId = this.getAttribute('data-template-id');
+        const templateCard = this.closest('.template-card');
+        const templateName = templateCard.querySelector('h3').textContent;
+        const templateDesc = templateCard.querySelector('p').textContent;
+        
+        // Set form values
+        templateIdField.value = templateId;
+        selectedTemplateName.textContent = templateName;
+        selectedTemplateDesc.textContent = templateDesc;
+        
+        // Show modal
+        modal.style.display = 'flex';
+      });
+    });
+    
+    // AI Assistant functionality
+    const aiPanel = document.querySelector('.ai-assistant-panel');
+    const aiHeader = document.querySelector('.ai-assistant-header');
+    const aiToggleBtn = document.querySelector('.ai-toggle-btn');
+    const chatInput = document.querySelector('.chat-input textarea');
+    const sendButton = document.querySelector('.btn-send');
+    const messagesContainer = document.querySelector('.chat-messages');
+    
+    // Toggle AI assistant
+    aiHeader.addEventListener('click', function() {
+      aiPanel.classList.toggle('collapsed');
+    });
+    
+    // Send message function
+    function sendMessage() {
+      const message = chatInput.value.trim();
+      if (!message) return;
+      
+      // Add user message to chat
+      const userMessageHtml = `
+        <div class="message user-message">
+          <div class="message-avatar">You</div>
+          <div class="message-content">
+            <p>${message}</p>
+          </div>
+        </div>
+      `;
+      messagesContainer.insertAdjacentHTML('beforeend', userMessageHtml);
+      
+      // Clear input
+      chatInput.value = '';
+      
+      // Scroll to bottom
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      
+      // Add loading indicator
+      const loadingHtml = `
+        <div class="message ai-message loading">
+          <div class="message-avatar">H</div>
+          <div class="message-content">
+            <p>Thinking...</p>
+          </div>
+        </div>
+      `;
+      messagesContainer.insertAdjacentHTML('beforeend', loadingHtml);
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      
+      // Send to backend API
+      fetch('/api/v1/ai_chat/message', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+        },
+        body: JSON.stringify({
+          prompt: message,
+          provider: 'auto'
+        })
+      })
+      .then(response => response.json())
+      .then(data => {
+        // Remove loading message
+        const loadingMsg = document.querySelector('.message.loading');
+        if (loadingMsg) loadingMsg.remove();
+        
+        // Add AI response
+        const aiResponseHtml = `
+          <div class="message ai-message">
+            <div class="message-avatar">H</div>
+            <div class="message-content">
+              <p>${data.response}</p>
+            </div>
+          </div>
+        `;
+        messagesContainer.insertAdjacentHTML('beforeend', aiResponseHtml);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      })
+      .catch(error => {
+        // Remove loading message
+        const loadingMsg = document.querySelector('.message.loading');
+        if (loadingMsg) loadingMsg.remove();
+        
+        // Add error message
+        const errorHtml = `
+          <div class="message ai-message">
+            <div class="message-avatar">H</div>
+            <div class="message-content">
+              <p>Sorry, I couldn't process your request. Please try again later.</p>
+            </div>
+          </div>
+        `;
+        messagesContainer.insertAdjacentHTML('beforeend', errorHtml);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      });
+    }
+    
+    // Send message on button click
+    sendButton.addEventListener('click', sendMessage);
+    
+    // Send message on Enter key
+    chatInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+    
+    // Initialize AI chat as expanded
+    aiPanel.classList.remove('collapsed');
+  });
+</script>

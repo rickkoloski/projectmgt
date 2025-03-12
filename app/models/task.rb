@@ -7,6 +7,11 @@ class Task < ApplicationRecord
   belongs_to :parent, class_name: 'Task', optional: true
   
   has_many :subtasks, class_name: 'Task', foreign_key: 'parent_id', dependent: :nullify
+  
+  # Helper method for creation of child tasks
+  def create_subtask(attributes = {})
+    subtasks.create!({ project_id: self.project_id }.merge(attributes))
+  end
   has_many :dependencies, class_name: 'TaskDependency', dependent: :destroy
   has_many :dependent_tasks, through: :dependencies
   has_many :external_notifications, dependent: :destroy

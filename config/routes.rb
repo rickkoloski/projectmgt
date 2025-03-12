@@ -77,8 +77,11 @@ Rails.application.routes.draw do
   # Defines the root path route ("/")
   root "gantt#index"
   
+  # Dashboard and project templates
+  get "dashboard", to: "dashboard#index", as: "dashboard"
+  post "create_from_template", to: "dashboard#create_from_template", as: "create_from_template"
+  
   # Add a controller for our Gantt chart
   get "gantt", to: "gantt#index"
-  get "dashboard", to: "gantt#dashboard", as: "dashboard"
   get "landing", to: "gantt#landing", as: "landing"
 end
