@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Harmoniq</title>
+    <title><%= content_for?(:page_title) ? yield(:page_title) + " - Harmoniq" : "Harmoniq" %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
@@ -17,13 +17,43 @@
     <%# Includes all stylesheet files in app/assets/stylesheets %>
     <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
     
-    <%# Include Vue app - full app for dashboard, AI chat only for other pages %>
-    <% if (controller_name == 'gantt' || controller_name == 'dashboard') && current_user.present? %>
-      <%# Full Vue app for dashboard %>
+    <%# Load header cleanup script in the head to ensure it's available early %>
+    <script>
+      // Inline version to ensure immediate availability
+      function goToDashboardSafely() {
+        // Look for the Back to Dashboard button that we know works correctly
+        var dashboardButton = document.querySelector('.btn-back');
+        
+        if (dashboardButton) {
+          console.log('goToDashboardSafely found .btn-back, clicking it');
+          dashboardButton.click();
+          return true;
+        }
+        
+        // Direct navigation fallback
+        console.log('goToDashboardSafely fallback navigation');
+        window.location.href = '/dashboard';
+        return false;
+      }
+      
+      // Make it globally available
+      window.goToDashboardSafely = goToDashboardSafely;
+    </script>
+    
+    <%# Load external header cleanup script %>
+    <script src="/assets/header_cleanup.js"></script>
+    
+    <%# Include Vue app - full app for dashboard, gantt, and projects %>
+    <% if (controller_name == 'gantt' || controller_name == 'dashboard' || controller_name == 'projects') && current_user.present? %>
+      <%# Full Vue app for views that need it %>
       <%= javascript_include_tag "application", defer: true %>
     <% elsif current_user.present? %>
       <%# AI chat component for other authenticated pages %>
-      <%= javascript_include_tag "ai_chat", defer: true %>
+      <% begin %>
+        <%= javascript_include_tag "ai_chat", defer: true, skip_pipeline: Rails.env.development? %>
+      <% rescue => e %>
+        <!-- AI chat not available: <%= e.message %> -->
+      <% end %>
     <% end %>
     
     <style>
@@ -47,7 +77,75 @@
   </head>
 
   <body class="<%= controller_name.in?(['sessions', 'users']) || (controller_name == 'gantt' && !current_user.present?) ? 'allow-scroll' : '' %>">
-    <% if (controller_name == 'gantt' && action_name == 'dashboard') && current_user.present? %>
+    <%# Clear any stale global elements on page load - AGGRESSIVE CLEANUP %>
+    <script>
+      // AGGRESSIVE CLEANUP: Remove any persisting elements from previous pages
+      (function() {
+        // 1. Clean up known style elements
+        const styleIds = ['gantt-custom-styles', 'gantt-bar-styles'];
+        styleIds.forEach(function(id) {
+          const el = document.getElementById(id);
+          if (el) el.parentNode.removeChild(el);
+        });
+        
+        // 2. Clean up project header elements that might have persisted
+        const projectHeaderEl = document.getElementById('harmoniq-project-header');
+        if (projectHeaderEl) {
+          console.log('Found and removing persistent project header');
+          projectHeaderEl.parentNode.removeChild(projectHeaderEl);
+        }
+        
+        // 3. Remove by class name as a fallback
+        const headers = document.getElementsByClassName('project-header');
+        for (let i = headers.length - 1; i >= 0; i--) {
+          console.log('Removing header by class name', i);
+          headers[i].parentNode.removeChild(headers[i]);
+        }
+        
+        // 4. Clean all custom styles that might be project-related
+        const styleSheets = document.styleSheets;
+        for (let i = styleSheets.length - 1; i >= 0; i--) {
+          try {
+            if (styleSheets[i].ownerNode && 
+                styleSheets[i].ownerNode.innerHTML && 
+                (styleSheets[i].ownerNode.innerHTML.includes('project-header') || 
+                 styleSheets[i].ownerNode.innerHTML.includes('task-bar'))) {
+              styleSheets[i].ownerNode.parentNode.removeChild(styleSheets[i].ownerNode);
+            }
+          } catch(e) {
+            // Might be a cross-origin stylesheet we can't inspect
+            console.log('Could not inspect stylesheet', i);
+          }
+        }
+        
+        // 5. Clear any global data
+        window.initialData = null;
+        
+        // 6. Set up a periodic check for the next 10 seconds to catch any late-appearing elements
+        // This helps with race conditions where elements might be added after our initial cleanup
+        let cleanupCount = 0;
+        const intervalId = setInterval(function() {
+          // Check for and remove any project headers
+          const lateHeaders = document.getElementsByClassName('project-header');
+          if (lateHeaders.length > 0) {
+            console.log('Found and removing late-appearing project headers:', lateHeaders.length);
+            for (let i = lateHeaders.length - 1; i >= 0; i--) {
+              // Only clean up headers if we're not on the project page
+              if (window.location.pathname.indexOf('/projects/') === -1) {
+                lateHeaders[i].parentNode.removeChild(lateHeaders[i]);
+              }
+            }
+          }
+          
+          // Stop after 5 checks (5 seconds)
+          if (++cleanupCount >= 5) {
+            clearInterval(intervalId);
+          }
+        }, 1000);
+      })();
+    </script>
+    
+    <% if controller_name == 'gantt' && current_user.present? %>
       <%# For gantt dashboard, include the complete Vue app %>
       <div id="main-app">
         <%# This will be replaced by Vue, but ensures the logout button is available before Vue loads %>
@@ -66,8 +164,8 @@
       <%# For all other pages, show regular content with AI chat %>
       <%= yield %>
       
-      <% if current_user.present? %>
-        <%# Add AI chat component container for logged-in users on all pages %>
+      <% if current_user.present? && controller_name != 'projects' %>
+        <%# Add AI chat component container for logged-in users on non-project pages %>
         <div id="ai-chat-app"></div>
       <% end %>
     <% end %>

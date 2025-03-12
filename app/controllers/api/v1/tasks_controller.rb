@@ -9,8 +9,15 @@ module Api
       
       # GET /api/v1/tasks
       def index
-        # Get all tasks and include necessary associations
-        @tasks = Task.includes(:project, :creator, :assignee, :parent).all
+        # Get tasks filtered by project_id if provided
+        if params[:project_id].present?
+          @tasks = Task.includes(:project, :creator, :assignee, :parent)
+                      .where(project_id: params[:project_id])
+        else
+          # Get all tasks and include necessary associations
+          @tasks = Task.includes(:project, :creator, :assignee, :parent).all
+        end
+        
         render json: @tasks
       end
       

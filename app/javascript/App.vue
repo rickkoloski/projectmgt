@@ -39,6 +39,10 @@
         </div>
         <div class="app-title">
           <h1>Harmoniq Project Management</h1>
+          <!-- Project subheader will be dynamically shown when on a project page -->
+          <div v-if="projectId" class="project-subtitle">
+            <h2>Project: {{ projectName }}</h2>
+          </div>
         </div>
       </div>
       
@@ -63,6 +67,10 @@
         
         <!-- Main Navigation Items -->
         <div class="nav-items-container">
+          <a href="/dashboard" class="nav-item" :title="sidebarCollapsed ? 'Home Dashboard' : ''">
+            <span class="nav-icon">🏠</span>
+            <span class="nav-label" v-if="!sidebarCollapsed">Home</span>
+          </a>
           <div class="nav-item" :class="{ active: currentView === 'gantt' }" @click="switchView('gantt')" :title="sidebarCollapsed ? 'Gantt' : ''">
             <span class="nav-icon">📊</span>
             <span class="nav-label" v-if="!sidebarCollapsed">Gantt</span>
@@ -93,23 +101,7 @@
             :title="sidebarCollapsed ? 'AI Assistant' : ''"
             :class="{ 'ai-active': aiChatExpanded }"
           >
-            <span class="nav-icon">
-              <svg 
-                xmlns="http://www.w3.org/2000/svg" 
-                width="22" 
-                height="22" 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                stroke-width="2" 
-                stroke-linecap="round" 
-                stroke-linejoin="round"
-              >
-                <path d="M12 2a8 8 0 0 1 8 8v12l-4-4H4a2 2 0 0 1-2-2V10a8 8 0 0 1 8-8h0z"></path>
-                <path d="M14 9.5a6 6 0 0 0-6 0"></path>
-                <path d="M12 13a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z"></path>
-              </svg>
-            </span>
+            <span class="nav-icon">💬</span>
             <span class="nav-label" v-if="!sidebarCollapsed">AI Assistant</span>
           </div>
         </div>
@@ -416,6 +408,10 @@ export default {
       // CSRF Token for form submissions
       csrfToken: document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
       
+      // Project information
+      projectId: null,
+      projectName: '',
+      
       // View Management
       currentView: 'gantt',
       showAppSwitcher: false,
@@ -598,8 +594,95 @@ export default {
       ]
     }
   },
+  mounted() {
+    // Get project info from DOM
+    const appElement = document.getElementById('main-app');
+    if (appElement && appElement.dataset.projectId) {
+      this.projectId = appElement.dataset.projectId;
+      console.log('Project ID loaded from DOM:', this.projectId);
+      
+      // Get project name from data attribute first (most reliable)
+      if (appElement.dataset.projectName) {
+        this.projectName = appElement.dataset.projectName;
+      }
+      // Fallback to initialData if available
+      else if (window.initialData && window.initialData.projects && window.initialData.projects.length > 0) {
+        this.projectName = window.initialData.projects[0].name;
+      }
+      
+      console.log('Project name loaded:', this.projectName);
+    }
+    
+    // Get initial data from window if available
+    if (window.initialData) {
+      console.log('Initial data loaded from window:', window.initialData);
+      // Process any data from initialData if needed
+    }
+    
+    // Fetch tasks and dependencies from the server
+    this.fetchTasksFromServer();
+  },
+  beforeDestroy() {
+    // Clean up custom style elements to prevent them from persisting
+    const barStyleEl = document.getElementById('gantt-bar-styles');
+    if (barStyleEl) {
+      barStyleEl.parentNode.removeChild(barStyleEl);
+    }
+    
+    // Clear global data to prevent it from persisting
+    window.initialData = null;
+  },
   methods: {
     // Navigation
+    triggerDashboardButton() {
+      // Attempt to find the Back to Dashboard button and click it
+      console.log('Looking for Back to Dashboard button');
+      
+      // Look for the button by class first, which is most specific
+      let dashboardButton = document.querySelector('.btn-back');
+      
+      // If not found by class, look by href
+      if (!dashboardButton) {
+        dashboardButton = document.querySelector('a[href="/dashboard"]');
+      }
+      
+      // If still not found, try looking by text content
+      if (!dashboardButton) {
+        // Loop through all links to find one with "Back to Dashboard" text
+        const allLinks = document.querySelectorAll('a');
+        for (let i = 0; i < allLinks.length; i++) {
+          if (allLinks[i].textContent.includes('Back to Dashboard')) {
+            dashboardButton = allLinks[i];
+            break;
+          }
+        }
+      }
+      
+      if (dashboardButton) {
+        console.log('Found Back to Dashboard button, clicking it');
+        // Directly trigger the working button's click
+        dashboardButton.click();
+      } else {
+        // Fallback if we can't find the button
+        console.log('Back to Dashboard button not found, using direct navigation');
+        // For direct navigation, use a hard href with force refresh
+        window.location.href = '/dashboard';
+      }
+    },
+    
+    // Keep this as a backup method
+    goToDashboard() {
+      // Use window.location.replace to ensure proper URL change with full navigation
+      console.log('Navigating to dashboard with full page reload');
+      window.location.replace('/dashboard');
+      
+      // In case replace doesn't work well in all browsers, also try href with prevent caching
+      // This adds a random query parameter to prevent caching
+      setTimeout(() => {
+        window.location.href = '/dashboard?nocache=' + new Date().getTime();
+      }, 100);
+    },
+    
     switchView(view) {
       if (view === 'gantt' || view === 'board' || view === 'resources') {
         this.currentView = view;
@@ -906,10 +989,12 @@ export default {
     
     // Task data management
     fetchTasksFromServer() {
-      console.log('Fetching tasks from server');
+      console.log('Fetching tasks from server for project:', this.projectId);
       
-      // Make API call to get tasks
-      fetch('/api/v1/tasks')
+      // Make API call to get tasks with project filter
+      const url = this.projectId ? `/api/v1/tasks?project_id=${this.projectId}` : '/api/v1/tasks';
+      
+      fetch(url)
         .then(response => response.json())
         .then(data => {
           console.log('Received tasks from server:', data);
@@ -997,8 +1082,10 @@ export default {
     },
     
     fetchDependenciesFromServer() {
-      // Fetch dependencies from server
-      fetch('/api/v1/task_dependencies')
+      // Fetch dependencies from server with project filter
+      const url = this.projectId ? `/api/v1/task_dependencies?project_id=${this.projectId}` : '/api/v1/task_dependencies';
+      
+      fetch(url)
         .then(response => response.json())
         .then(data => {
           console.log('Received dependencies from server:', data);
@@ -1457,6 +1544,17 @@ body {
   font-weight: 600;
 }
 
+.project-subtitle {
+  margin-top: 3px;
+}
+
+.project-subtitle h2 {
+  font-size: 14px;
+  margin: 0;
+  color: #666;
+  font-weight: normal;
+}
+
 .app-left-controls {
   display: flex;
   align-items: center;
@@ -1643,6 +1741,11 @@ body {
   padding: 10px 0;
   border-top: 1px solid #e1e4e8;
   margin-top: auto;
+  width: 100%;
+  position: sticky;
+  bottom: 0;
+  background-color: #f8f9fa;
+  z-index: 5;
 }
 
 .nav-item {
@@ -1654,6 +1757,14 @@ body {
   border-radius: 4px;
   margin: 2px 8px;
   transition: all 0.2s;
+  text-decoration: none;
+}
+
+/* Style for the cloned Back to Dashboard button */
+.btn-back-clone {
+  /* Ensure it looks like a nav item while preserving the essential behavior */
+  background-color: #e6f0ff !important;
+  font-weight: 500 !important;
 }
 
 .nav-item:hover:not(.disabled) {
@@ -1674,16 +1785,21 @@ body {
 .nav-item.ai-item {
   color: #6699CC;
   font-weight: 500;
+  background-color: #e6f0ff;
+  border: 1px solid #c0d5e8;
+  margin: 2px 15px; /* Wider margin for better appearance */
 }
 
 .nav-item.ai-item:hover {
-  background-color: #e6f0ff;
+  background-color: #d8e8ff;
+  border-color: #6699CC;
 }
 
 .nav-item.ai-item.ai-active {
-  background-color: #e6f0ff;
-  color: #2b6cb0;
+  background-color: #6699CC;
+  color: white;
   font-weight: 500;
+  border-color: #5588bb;
 }
 
 .nav-icon {

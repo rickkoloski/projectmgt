@@ -30,75 +30,82 @@
       </div>
     </div>
 
-    <div class="main-sections">
-      <div class="projects-section">
-        <div class="section-header">
-          <h2>Your Projects</h2>
-          <button id="showCreateProjectModal" class="btn-primary">New Project</button>
-        </div>
+    <div class="projects-section">
+      <div class="section-header">
+        <h2>Your Projects</h2>
+        <button id="showCreateProjectModal" class="btn-primary">New Project</button>
+      </div>
 
-        <div class="projects-grid">
-          <% if @projects.any? %>
-            <% @projects.each do |project| %>
-              <div class="project-card">
-                <div class="project-header">
-                  <h3><%= project.name %></h3>
-                  <span class="project-status badge-<%= project.status %>"><%= project.status.humanize %></span>
-                </div>
-                <div class="project-stats">
-                  <div class="stat-item">
-                    <span class="stat-label">Tasks</span>
-                    <span class="stat-value"><%= project.tasks.count %></span>
-                  </div>
-                  <div class="stat-item">
-                    <span class="stat-label">Progress</span>
+      <div class="projects-table-container">
+        <% if @projects.any? %>
+          <table class="projects-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Status</th>
+                <th>Tasks</th>
+                <th>Progress</th>
+                <th>Start Date</th>
+                <th>End Date</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% @projects.each do |project| %>
+                <tr>
+                  <td class="project-name"><%= project.name %></td>
+                  <td>
+                    <span class="project-status badge-<%= project.status %>"><%= project.status.humanize %></span>
+                  </td>
+                  <td class="text-center"><%= project.tasks.count %></td>
+                  <td>
+                    <% 
+                    status_to_check = project.tasks.where(status: 'completed').count > 0 ? 'completed' : 'done'
+                    completed_percent = project.tasks.count > 0 ? 
+                      (project.tasks.where(status: status_to_check).count.to_f / project.tasks.count * 100).round : 0 
+                    %>
                     <div class="progress-bar">
-                      <% 
-                      status_to_check = project.tasks.where(status: 'completed').count > 0 ? 'completed' : 'done'
-                      completed_percent = project.tasks.count > 0 ? 
-                        (project.tasks.where(status: status_to_check).count.to_f / project.tasks.count * 100).round : 0 
-                      %>
                       <div class="progress-fill" style="width: <%= completed_percent %>%"></div>
                       <span class="progress-text"><%= completed_percent %>%</span>
                     </div>
-                  </div>
-                </div>
-                <div class="project-dates">
-                  <% if project.start_date && project.end_date %>
-                    <span>
-                      <%= project.start_date.strftime("%b %d") %> - <%= project.end_date.strftime("%b %d, %Y") %>
-                    </span>
-                  <% end %>
-                </div>
-                <div class="project-actions">
-                  <a href="<%= project_path(project) %>" class="btn-view">View Project</a>
-                </div>
-              </div>
-            <% end %>
-          <% else %>
-            <div class="no-projects">
-              <p>You don't have any projects yet. Get started by creating a new project from a template.</p>
-            </div>
-          <% end %>
-        </div>
+                  </td>
+                  <td class="date-column"><%= project.start_date&.strftime("%b %d, %Y") || 'N/A' %></td>
+                  <td class="date-column"><%= project.end_date&.strftime("%b %d, %Y") || 'N/A' %></td>
+                  <td class="actions-column">
+                    <a href="<%= project_path(project) %>" class="icon-link" title="View Project">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                      </svg>
+                    </a>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        <% else %>
+          <div class="no-projects">
+            <p>You don't have any projects yet. Get started by creating a new project from a template.</p>
+          </div>
+        <% end %>
+      </div>
+    </div>
+
+    <div class="templates-section">
+      <div class="section-header">
+        <h2>Project Templates</h2>
+        <p>Create a new project using one of our templates</p>
       </div>
 
-      <div class="templates-section">
-        <div class="section-header">
-          <h2>Project Templates</h2>
-          <p>Create a new project using one of our templates</p>
-        </div>
-
-        <div class="templates-grid">
-          <% @project_templates.each do |template| %>
-            <div class="template-card" data-template-id="<%= template[:id] %>">
-              <div class="template-icon"><%= template[:icon] %></div>
-              <h3><%= template[:name] %></h3>
-              <p><%= template[:description] %></p>
-              <button class="btn-use-template" data-template-id="<%= template[:id] %>">Use Template</button>
-            </div>
-          <% end %>
-        </div>
+      <div class="templates-grid">
+        <% @project_templates.each do |template| %>
+          <div class="template-card" data-template-id="<%= template[:id] %>">
+            <div class="template-icon"><%= template[:icon] %></div>
+            <h3><%= template[:name] %></h3>
+            <p><%= template[:description] %></p>
+            <button class="btn-use-template" data-template-id="<%= template[:id] %>">Use Template</button>
+          </div>
+        <% end %>
       </div>
     </div>
   </div>
@@ -182,44 +189,48 @@
     margin: 0;
   }
   
-  /* Main Sections Layout */
-  .main-sections {
-    display: grid;
-    grid-template-columns: 2fr 1fr;  /* 2/3 for projects, 1/3 for templates */
-    gap: 20px;
-  }
-  
-  /* Projects Grid */
-  .projects-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));  /* Slightly smaller cards */
-    gap: 15px;  /* Reduced from 20px */
-  }
-  
-  .project-card {
+  /* Projects Table Styles */
+  .projects-table-container {
     background: white;
     border-radius: 8px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    padding: 15px;  /* Reduced from 20px */
-    transition: transform 0.2s, box-shadow 0.2s;
+    overflow: hidden;
+    margin-bottom: 20px;
   }
   
-  .project-card:hover {
-    transform: translateY(-3px);  /* Less dramatic lift */
-    box-shadow: 0 3px 10px rgba(0,0,0,0.15);
+  .projects-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
   }
   
-  .project-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 10px;  /* Reduced from 15px */
+  .projects-table th {
+    background-color: #f5f7fa;
+    color: #4a5568;
+    font-weight: 600;
+    text-align: left;
+    padding: 12px 15px;
+    border-bottom: 1px solid #e2e8f0;
   }
   
-  .project-header h3 {
-    margin: 0;
-    font-size: 16px;  /* Reduced from 18px */
-    color: #333;
+  .projects-table td {
+    padding: 12px 15px;
+    border-bottom: 1px solid #e2e8f0;
+    color: #4a5568;
+    vertical-align: middle;
+  }
+  
+  .projects-table tbody tr:hover {
+    background-color: #f8fafc;
+  }
+  
+  .projects-table tbody tr:last-child td {
+    border-bottom: none;
+  }
+  
+  .project-name {
+    font-weight: 500;
+    color: #2d3748;
   }
   
   .project-status {
@@ -277,34 +288,50 @@
   .progress-text {
     position: absolute;
     right: 5px;
-    top: -5px;
+    top: -3px;
     font-size: 11px;  /* Reduced from 12px */
     color: #555;
   }
   
-  .project-dates {
-    font-size: 12px;  /* Reduced from 13px */
-    color: #666;
-    margin-bottom: 10px;  /* Reduced from 15px */
+  .text-center {
+    text-align: center;
   }
   
-  .project-actions {
-    margin-top: 10px;  /* Reduced from 15px */
+  .date-column {
+    white-space: nowrap;
+    font-size: 12px;
+    color: #718096;
   }
   
-  .btn-view {
-    display: inline-block;
-    padding: 6px 12px;  /* Reduced from 8px 15px */
-    background: #6699CC;
-    color: white;
+  .actions-column {
+    text-align: center;
+    width: 60px;
+  }
+  
+  .icon-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #6699CC;
+    padding: 6px;
     border-radius: 4px;
-    text-decoration: none;
-    font-size: 13px;  /* Reduced from 14px */
-    transition: background 0.2s;
+    transition: all 0.2s;
   }
   
-  .btn-view:hover {
-    background: #5588bb;
+  .icon-link:hover {
+    background-color: #e6f0ff;
+    color: #3366CC;
+  }
+  
+  /* Progress bar in table context */
+  .projects-table .progress-bar {
+    height: 6px;
+    background: #eee;
+    border-radius: 3px;
+    overflow: hidden;
+    position: relative;
+    width: 100%;
+    min-width: 100px;
   }
   
   .no-projects {

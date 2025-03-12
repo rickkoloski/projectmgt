@@ -83,5 +83,6 @@ Rails.application.routes.draw do
   
   # Add a controller for our Gantt chart
   get "gantt", to: "gantt#index"
+  get "gantt/projects/:id", to: "gantt#dashboard", as: "project_gantt"
   get "landing", to: "gantt#landing", as: "landing"
 end

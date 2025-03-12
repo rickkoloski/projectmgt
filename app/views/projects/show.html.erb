@@ -1,0 +1,101 @@
+<% content_for :page_title, "Project: #{@project_name}" %>
+
+<!-- Project header moved to App.vue component -->
+
+<div class="project-gantt-content">
+  <!-- Load Gantt content directly here -->
+  <div id="main-app">
+    <!-- The Vue app will be mounted here -->
+  </div>
+</div>
+
+<script>
+  // Make sure the server data is available in the global scope
+  window.initialData = <%= @gantt_data.to_json.html_safe %>;
+  
+  document.addEventListener('DOMContentLoaded', function() {
+    console.log('Project view loaded - setting up for direct rendering');
+    console.log('Project ID:', <%= @project_id %>);
+    console.log('Tasks loaded:', window.initialData.tasks.length);
+    
+    // Create data attributes for the Vue app to read
+    const appElement = document.getElementById('main-app');
+    if (appElement) {
+      appElement.dataset.projectId = "<%= @project_id %>";
+      appElement.dataset.projectName = "<%= @project_name.gsub('"', '\\"') %>";
+      appElement.dataset.tasksLoaded = window.initialData.tasks.length;
+    }
+  });
+</script>
+
+<!-- Add debug link for developers -->
+<div class="debug-links" style="text-align: right; margin: 10px; font-size: 12px; color: #999;">
+  <a href="<%= project_path(@project_id, debug: 'true') %>" target="_blank" style="color: #999; text-decoration: none;">🔍 Debug Access</a>
+</div>
+
+<style>
+  .project-subheader {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 10px 20px;
+    background: #f9f9f9;
+    border-bottom: 1px solid #ddd;
+    display: flex;
+    align-items: center;
+  }
+  
+  .project-info {
+    flex: 1;
+  }
+  
+  .project-subheader h2 {
+    margin: 0;
+    color: #333;
+    font-size: 20px;
+  }
+  
+  .project-meta {
+    margin: 5px 0 0 0;
+    color: #666;
+    font-size: 14px;
+  }
+  
+  .project-gantt-content {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    height: 800px;
+  }
+  
+  /* Legacy styles kept for reference */
+  .project-gantt-frame {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+  
+  .navigation-buttons {
+    display: flex;
+    gap: 10px;
+  }
+  
+  .btn-back {
+    display: inline-block;
+    padding: 8px 15px;
+    border-radius: 4px;
+    text-decoration: none;
+    font-size: 14px;
+    background: #f5f5f5;
+    color: #333;
+    border: 1px solid #ddd;
+  }
+  
+  .btn-back:hover {
+    background: #eee;
+  }
+</style>
+
+<script>
+  // Log that we've loaded the project view
+  console.log("Project view loaded for project: <%= @project_id %>");
+</script>

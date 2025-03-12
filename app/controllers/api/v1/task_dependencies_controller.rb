@@ -8,7 +8,18 @@ module Api
       
       # GET /api/v1/task_dependencies
       def index
-        @dependencies = TaskDependency.all
+        # Get dependencies filtered by project_id if provided
+        if params[:project_id].present?
+          # Find task IDs belonging to the specified project
+          task_ids = Task.where(project_id: params[:project_id]).pluck(:id)
+          
+          # Find dependencies where either the from or to task is in this project
+          @dependencies = TaskDependency.where(task_id: task_ids)
+                                       .or(TaskDependency.where(dependent_task_id: task_ids))
+        else
+          @dependencies = TaskDependency.all
+        end
+        
         render json: @dependencies
       end
       

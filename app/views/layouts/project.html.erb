@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title><%= content_for?(:page_title) ? yield(:page_title) + " - Harmoniq" : "Harmoniq" %></title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
+
+    <%= yield :head %>
+
+    <link rel="icon" href="/icon.png" type="image/png">
+    <link rel="icon" href="/icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/icon.png">
+
+    <%# Includes all stylesheet files in app/assets/stylesheets %>
+    <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
+    
+    <%# Include Vue app for project view %>
+    <%= javascript_include_tag "application", defer: true %>
+    
+    <style>
+      html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+      }
+      
+      body {
+        min-height: 100%;
+        position: relative;
+      }
+    </style>
+    
+    <script>
+      // AGGRESSIVE CLEANUP: Remove any persisting elements from previous pages
+      (function() {
+        // 1. Clean up known style elements
+        const styleIds = ['gantt-custom-styles', 'gantt-bar-styles'];
+        styleIds.forEach(function(id) {
+          const el = document.getElementById(id);
+          if (el) el.parentNode.removeChild(el);
+        });
+        
+        // 2. Clean up project header elements that might have persisted
+        const projectHeaderEl = document.getElementById('harmoniq-project-header');
+        if (projectHeaderEl && projectHeaderEl.parentNode !== document.currentScript.parentNode.parentNode) {
+          console.log('Found and removing persistent project header');
+          projectHeaderEl.parentNode.removeChild(projectHeaderEl);
+        }
+        
+        // 3. Remove by class name as a fallback - but only old ones
+        const headers = document.getElementsByClassName('project-header');
+        for (let i = headers.length - 1; i >= 0; i--) {
+          // Skip the one we're about to add with this page
+          if (headers[i].id !== 'harmoniq-project-header') {
+            console.log('Removing header by class name', i);
+            headers[i].parentNode.removeChild(headers[i]);
+          }
+        }
+        
+        // 4. Clean all custom styles that might be project-related
+        const styleSheets = document.styleSheets;
+        for (let i = styleSheets.length - 1; i >= 0; i--) {
+          try {
+            if (styleSheets[i].ownerNode && 
+                styleSheets[i].ownerNode.innerHTML && 
+                (styleSheets[i].ownerNode.innerHTML.includes('project-header') || 
+                 styleSheets[i].ownerNode.innerHTML.includes('task-bar'))) {
+              styleSheets[i].ownerNode.parentNode.removeChild(styleSheets[i].ownerNode);
+            }
+          } catch(e) {
+            // Might be a cross-origin stylesheet we can't inspect
+            console.log('Could not inspect stylesheet', i);
+          }
+        }
+        
+        // 5. Clear any global data
+        window.initialData = null;
+      })();
+    </script>
+  </head>
+
+  <body>
+    <%# Main content from the project templates %>
+    <%= yield %>
+    
+    <script>
+      // Add exit cleanup - when navigating away
+      window.addEventListener('beforeunload', function() {
+        // Clean up style elements
+        const styleIds = ['gantt-custom-styles', 'gantt-bar-styles'];
+        styleIds.forEach(function(id) {
+          const el = document.getElementById(id);
+          if (el) el.parentNode.removeChild(el);
+        });
+      });
+    </script>
+  </body>
+</html>

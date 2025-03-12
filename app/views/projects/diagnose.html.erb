@@ -1,0 +1,135 @@
+<h1>Project Access Diagnostic</h1>
+
+<p>This page helps troubleshoot project access issues</p>
+
+<div class="diagnostic-info">
+  <h2>Project Info</h2>
+  <% if @project %>
+    <table>
+      <tr>
+        <th>ID</th>
+        <td><%= @project.id %></td>
+      </tr>
+      <tr>
+        <th>Name</th>
+        <td><%= @project.name %></td>
+      </tr>
+      <tr>
+        <th>Organization ID</th>
+        <td><%= @project.organization_id %></td>
+      </tr>
+      <tr>
+        <th>Status</th>
+        <td><%= @project.status %></td>
+      </tr>
+    </table>
+  <% else %>
+    <p>Project not found</p>
+  <% end %>
+  
+  <h2>User Info</h2>
+  <% if current_user %>
+    <table>
+      <tr>
+        <th>ID</th>
+        <td><%= current_user.id %></td>
+      </tr>
+      <tr>
+        <th>Name</th>
+        <td><%= current_user.name %></td>
+      </tr>
+      <tr>
+        <th>Email</th>
+        <td><%= current_user.email %></td>
+      </tr>
+      <tr>
+        <th>Organization ID</th>
+        <td><%= current_user.organization_id %></td>
+      </tr>
+      <tr>
+        <th>Role</th>
+        <td><%= current_user.role %></td>
+      </tr>
+      <tr>
+        <th>Admin?</th>
+        <td><%= current_user.admin? %></td>
+      </tr>
+      <tr>
+        <th>Member?</th>
+        <td><%= current_user.member? %></td>
+      </tr>
+    </table>
+  <% else %>
+    <p>Not logged in</p>
+  <% end %>
+  
+  <h2>Permission Check</h2>
+  <% if @project && current_user %>
+    <table>
+      <tr>
+        <th>has_permission?('view')</th>
+        <td><%= current_user.has_permission?(@project, 'view') %></td>
+      </tr>
+      <tr>
+        <th>Same organization?</th>
+        <td><%= @project.organization_id == current_user.organization_id %></td>
+      </tr>
+      <tr>
+        <th>Direct permission count</th>
+        <td><%= current_user.permissions.where(resource_type: 'Project', resource_id: @project.id).count %></td>
+      </tr>
+    </table>
+  <% else %>
+    <p>Cannot check permissions without both project and user</p>
+  <% end %>
+</div>
+
+<div class="actions">
+  <a href="<%= dashboard_path %>" class="btn">Back to Dashboard</a>
+</div>
+
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    margin: 40px;
+    line-height: 1.6;
+  }
+  
+  h1, h2 {
+    color: #2c3e50;
+  }
+  
+  .diagnostic-info {
+    margin: 20px 0;
+  }
+  
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-bottom: 20px;
+  }
+  
+  th, td {
+    border: 1px solid #ddd;
+    padding: 8px 12px;
+    text-align: left;
+  }
+  
+  th {
+    background-color: #f5f5f5;
+    width: 30%;
+  }
+  
+  .actions {
+    margin-top: 30px;
+  }
+  
+  .btn {
+    display: inline-block;
+    padding: 10px 15px;
+    background: #3498db;
+    color: white;
+    text-decoration: none;
+    border-radius: 4px;
+  }
+</style>

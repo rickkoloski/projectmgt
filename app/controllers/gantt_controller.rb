@@ -18,9 +18,10 @@ class GanttController < ApplicationController
     authenticate_user!
     
     # Check if a specific project is requested
-    if params[:project_id].present?
+    if params[:project_id].present? || params[:id].present?
+      project_id = params[:project_id] || params[:id]
       # Load a specific project if user has access
-      @project = Project.find(params[:project_id])
+      @project = Project.find(project_id)
       
       # Verify access
       unless current_user.admin? || 
