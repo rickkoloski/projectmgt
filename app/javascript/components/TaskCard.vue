@@ -8,16 +8,24 @@
     @dragstart="onDragStart"
     @dragend="onDragEnd"
   >
-    <div class="card-header" @click="expanded = !expanded">
+    <div class="card-header" @click="expanded = !expanded" :title="task.description">
       <div class="card-header-top">
         <div class="task-title">{{ task.name }}</div>
         <button class="task-delete-btn" @click.stop="confirmDelete" title="Delete task">×</button>
       </div>
-      <div class="card-status-badge">{{ statusLabel }}</div>
+      <div class="task-meta">
+        <div class="card-status-badge">{{ statusLabel }}</div>
+        <div v-if="task.description && !expanded" class="description-indicator">📝</div>
+      </div>
       <div class="progress-indicator" :style="{ width: `${task.progress}%` }"></div>
     </div>
     
     <div v-if="expanded" class="card-details">
+      <!-- Description section if available -->
+      <div v-if="task.description" class="detail-row description-row">
+        <div class="task-description">{{ task.description }}</div>
+      </div>
+      
       <div class="detail-row">
         <label>Start:</label>
         <input 
@@ -260,14 +268,25 @@ export default {
   background-color: #dc3545;
 }
 
+.task-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
 .card-status-badge {
   font-size: 11px;
   padding: 2px 8px;
   border-radius: 12px;
   display: inline-block;
-  margin-bottom: 8px;
   font-weight: 500;
-  align-self: flex-start;
+}
+
+.description-indicator {
+  font-size: 12px;
+  opacity: 0.7;
+  cursor: pointer;
 }
 
 /* Status-specific badge colors */
@@ -334,6 +353,20 @@ export default {
   display: flex;
   align-items: center;
   margin-bottom: 10px;
+}
+
+.description-row {
+  display: block;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px dashed #ddd;
+}
+
+.task-description {
+  font-size: 13px;
+  line-height: 1.4;
+  color: #555;
+  white-space: pre-line;
 }
 
 .detail-row label {

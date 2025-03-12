@@ -5,8 +5,9 @@
         {{ task.expanded ? '▼' : '►' }}
       </div>
       
-      <div class="table-cell table-name" @click="openTaskDialog">
+      <div class="table-cell table-name" @click="openTaskDialog" :title="task.description">
         <span>{{ task.name }}</span>
+        <span v-if="task.description" class="description-indicator">📝</span>
       </div>
       
       <div v-if="visibleColumns.startDate" class="table-cell table-date" @click="editField('startDate')">
@@ -121,6 +122,16 @@
                   class="form-control" 
                   v-model="dialogValues.name"
                 />
+              </div>
+              
+              <div class="form-group">
+                <label for="task-description">Description</label>
+                <textarea 
+                  id="task-description" 
+                  class="form-control" 
+                  rows="3" 
+                  v-model="dialogValues.description"
+                ></textarea>
               </div>
               
               <div class="form-row">
@@ -296,6 +307,7 @@ export default {
       showTaskDialog: false,
       dialogValues: {
         name: this.task.name,
+        description: this.task.description || '',
         startDate: this.formatDateForInput(this.task.startDate),
         endDate: this.formatDateForInput(this.task.endDate),
         progress: this.task.progress,
@@ -410,6 +422,7 @@ export default {
       // Initialize dialog values from task
       this.dialogValues = {
         name: this.task.name,
+        description: this.task.description || '',
         startDate: this.formatDateForInput(this.task.startDate),
         endDate: this.formatDateForInput(this.task.endDate),
         progress: this.task.progress,
@@ -428,6 +441,7 @@ export default {
       // Create an object with the updated values
       const updatedValues = {
         name: this.dialogValues.name,
+        description: this.dialogValues.description,
         startDate: new Date(this.dialogValues.startDate),
         endDate: new Date(this.dialogValues.endDate),
         progress: Math.min(100, Math.max(0, this.dialogValues.progress)),
@@ -492,6 +506,22 @@ export default {
   cursor: pointer;
   height: 100%;
   position: relative;
+}
+
+.table-name {
+  display: flex;
+  align-items: center;
+}
+
+.table-name span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.description-indicator {
+  margin-left: 8px;
+  font-size: 12px;
+  opacity: 0.6;
 }
 
 .task-input {

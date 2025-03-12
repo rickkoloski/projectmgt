@@ -55,13 +55,22 @@ Rails.application.routes.draw do
       
       resources :organizations, only: [:index, :show, :create, :update, :destroy]
       resources :projects, only: [:index, :show, :create, :update, :destroy]
-      resources :tasks, only: [:index, :show, :create, :update, :destroy]
+      resources :tasks, only: [:index, :show, :create, :update, :destroy] do
+        collection do
+          post 'replace_all'
+        end
+      end
       
       # Shared links
       resources :shared_links, only: [:create, :update, :destroy]
       
       # External notifications
       resources :notifications, only: [:index, :create, :update], controller: 'external_notifications'
+      
+      # AI Chat endpoints
+      post 'ai_chat/message', to: 'ai_chat#message'
+      get 'ai_chat/providers', to: 'ai_chat#providers'
+      post 'ai_chat/generate_tasks', to: 'ai_chat#generate_tasks_endpoint'
     end
   end
 
@@ -70,5 +79,6 @@ Rails.application.routes.draw do
   
   # Add a controller for our Gantt chart
   get "gantt", to: "gantt#index"
-  get "dashboard", to: "gantt#index", as: "dashboard"
+  get "dashboard", to: "gantt#dashboard", as: "dashboard"
+  get "landing", to: "gantt#landing", as: "landing"
 end

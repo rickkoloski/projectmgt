@@ -2,11 +2,7 @@
   <div class="app-container">
     <!-- App Header - Smaller and with app switcher -->
     <header class="app-header">
-      <div class="app-title">
-        <h1>Project Management</h1>
-      </div>
-      
-      <div class="app-controls">
+      <div class="app-left-controls">
         <div class="debug-button" @click="toggleDebugPanel">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M8 2l1 2.5M12 2l-1 2.5M16 2l-1 2.5M2.75 9.5h18.5M2.75 14.5h18.5M12 12a4 4 0 0 0-4 4M12 12a4 4 0 0 1 4 4M18 18.5a7 7 0 1 1-12 0"/>
@@ -41,6 +37,17 @@
             </div>
           </div>
         </div>
+        <div class="app-title">
+          <h1>Project Management</h1>
+        </div>
+      </div>
+      
+      <div class="app-right-controls">
+        <form action="/logout" method="post" class="logout-form">
+          <input type="hidden" name="_method" value="delete">
+          <input type="hidden" name="authenticity_token" :value="csrfToken">
+          <button type="submit" class="logout-button">Logout</button>
+        </form>
       </div>
     </header>
     
@@ -54,25 +61,57 @@
           <span v-else>←</span>
         </div>
         
-        <div class="nav-item" :class="{ active: currentView === 'gantt' }" @click="switchView('gantt')" :title="sidebarCollapsed ? 'Gantt' : ''">
-          <span class="nav-icon">📊</span>
-          <span class="nav-label" v-if="!sidebarCollapsed">Gantt</span>
+        <!-- Main Navigation Items -->
+        <div class="nav-items-container">
+          <div class="nav-item" :class="{ active: currentView === 'gantt' }" @click="switchView('gantt')" :title="sidebarCollapsed ? 'Gantt' : ''">
+            <span class="nav-icon">📊</span>
+            <span class="nav-label" v-if="!sidebarCollapsed">Gantt</span>
+          </div>
+          <div class="nav-item" :class="{ active: currentView === 'board' }" @click="switchView('board')" :title="sidebarCollapsed ? 'Board' : ''">
+            <span class="nav-icon">📋</span>
+            <span class="nav-label" v-if="!sidebarCollapsed">Board</span>
+          </div>
+          <div class="nav-item" :class="{ active: currentView === 'resources' }" @click="switchView('resources')" :title="sidebarCollapsed ? 'Resources' : ''">
+            <span class="nav-icon">👥</span>
+            <span class="nav-label" v-if="!sidebarCollapsed">Resources</span>
+          </div>
+          <div class="nav-item disabled" :title="sidebarCollapsed ? 'Reports (Coming Soon)' : ''">
+            <span class="nav-icon">📈</span>
+            <span class="nav-label" v-if="!sidebarCollapsed">Reports</span>
+          </div>
+          <div class="nav-item disabled" :title="sidebarCollapsed ? 'Settings (Coming Soon)' : ''">
+            <span class="nav-icon">⚙️</span>
+            <span class="nav-label" v-if="!sidebarCollapsed">Settings</span>
+          </div>
         </div>
-        <div class="nav-item" :class="{ active: currentView === 'board' }" @click="switchView('board')" :title="sidebarCollapsed ? 'Board' : ''">
-          <span class="nav-icon">📋</span>
-          <span class="nav-label" v-if="!sidebarCollapsed">Board</span>
-        </div>
-        <div class="nav-item" :class="{ active: currentView === 'resources' }" @click="switchView('resources')" :title="sidebarCollapsed ? 'Resources' : ''">
-          <span class="nav-icon">👥</span>
-          <span class="nav-label" v-if="!sidebarCollapsed">Resources</span>
-        </div>
-        <div class="nav-item disabled" :title="sidebarCollapsed ? 'Reports (Coming Soon)' : ''">
-          <span class="nav-icon">📈</span>
-          <span class="nav-label" v-if="!sidebarCollapsed">Reports</span>
-        </div>
-        <div class="nav-item disabled" :title="sidebarCollapsed ? 'Settings (Coming Soon)' : ''">
-          <span class="nav-icon">⚙️</span>
-          <span class="nav-label" v-if="!sidebarCollapsed">Settings</span>
+        
+        <!-- AI Assistant Link (Fixed at Bottom) -->
+        <div class="sidebar-footer">
+          <div 
+            class="nav-item ai-item" 
+            @click="toggleAIChat"
+            :title="sidebarCollapsed ? 'AI Assistant' : ''"
+            :class="{ 'ai-active': aiChatExpanded }"
+          >
+            <span class="nav-icon">
+              <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                width="22" 
+                height="22" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                stroke-width="2" 
+                stroke-linecap="round" 
+                stroke-linejoin="round"
+              >
+                <path d="M12 2a8 8 0 0 1 8 8v12l-4-4H4a2 2 0 0 1-2-2V10a8 8 0 0 1 8-8h0z"></path>
+                <path d="M14 9.5a6 6 0 0 0-6 0"></path>
+                <path d="M12 13a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z"></path>
+              </svg>
+            </span>
+            <span class="nav-label" v-if="!sidebarCollapsed">AI Assistant</span>
+          </div>
         </div>
       </aside>
       
@@ -167,6 +206,150 @@
             </button>
           </div>
         </div>
+        
+        <!-- Task Bar Styling Controls -->
+        <div class="debug-section" v-if="currentView === 'gantt'">
+          <h4>Gantt Styling</h4>
+          <div class="debug-info">
+            <div class="debug-control">
+              <label for="detailBarHeight"><strong>Detail Bar Height:</strong></label>
+              <div class="debug-input-group">
+                <input 
+                  type="range" 
+                  id="detailBarHeight" 
+                  v-model="detailTaskBarHeight" 
+                  min="10" 
+                  max="50" 
+                  step="1"
+                  @input="updateDetailBarHeight"
+                />
+                <span class="debug-value">{{ detailTaskBarHeight }}px</span>
+              </div>
+            </div>
+            
+            <button 
+              type="button" 
+              class="btn-debug-action"
+              @click="resetBarHeights"
+            >
+              Reset Heights
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- AI Chat Panel -->
+    <div 
+      class="ai-chat-panel" 
+      v-if="aiChatExpanded"
+      :class="{ 
+        'dragging': isDraggingAIChatPanel,
+        'docked': aiChatDockPosition !== 'free',
+        'dock-north': aiChatDockPosition === 'north',
+        'dock-south': aiChatDockPosition === 'south',
+        'dock-east': aiChatDockPosition === 'east',
+        'dock-west': aiChatDockPosition === 'west'
+      }"
+      :style="aiChatDockPosition === 'free' ? { 
+        top: aiChatPanelPosition.top + 'px', 
+        left: aiChatPanelPosition.left + 'px',
+        width: '400px',
+        height: '500px'
+      } : {}"
+    >
+      <div 
+        class="ai-chat-panel-header"
+        @mousedown="startDragAIChatPanel"
+      >
+        <h3>AI Assistant</h3>
+        <div class="ai-chat-panel-controls">
+          <!-- Dock Position Controls -->
+          <div class="dock-controls">
+            <button 
+              class="dock-button" 
+              :class="{ 'active': aiChatDockPosition === 'north' }"
+              title="Dock to top"
+              @click.stop="dockAIChat('north')"
+            >
+              ↑
+            </button>
+            <button 
+              class="dock-button" 
+              :class="{ 'active': aiChatDockPosition === 'west' }"
+              title="Dock to left"
+              @click.stop="dockAIChat('west')"
+            >
+              ←
+            </button>
+            <button 
+              class="dock-button" 
+              :class="{ 'active': aiChatDockPosition === 'free' }"
+              title="Undock (free floating)"
+              @click.stop="dockAIChat('free')"
+            >
+              ⊙
+            </button>
+            <button 
+              class="dock-button" 
+              :class="{ 'active': aiChatDockPosition === 'east' }"
+              title="Dock to right"
+              @click.stop="dockAIChat('east')"
+            >
+              →
+            </button>
+            <button 
+              class="dock-button" 
+              :class="{ 'active': aiChatDockPosition === 'south' }"
+              title="Dock to bottom"
+              @click.stop="dockAIChat('south')"
+            >
+              ↓
+            </button>
+          </div>
+          
+          <span class="drag-indicator" v-if="aiChatDockPosition === 'free'">⬌</span>
+          <button @click="toggleAIChat">×</button>
+        </div>
+      </div>
+      <div class="ai-chat-panel-content">
+        <div class="ai-chat-messages">
+          <div class="ai-message">
+            <div class="ai-avatar">AI</div>
+            <div class="message-content">
+              <p>Hello! I'm your project assistant. Ask me about tasks, suggest project improvements, or get help with planning.</p>
+            </div>
+          </div>
+          
+          <div v-for="(message, index) in aiChatMessages" :key="index" 
+               :class="['message', message.sender === 'ai' ? 'ai-message' : 'user-message', message.loading ? 'loading-message' : '', message.error ? 'error-message' : '']">
+            <div v-if="message.sender === 'ai'" class="ai-avatar">AI</div>
+            <div class="message-content">
+              <p v-if="!message.loading">{{ message.content }}</p>
+              <p v-else class="loading-dots">Thinking<span>.</span><span>.</span><span>.</span></p>
+              <div v-if="message.provider && message.model" class="message-meta">
+                via {{ message.provider }} ({{ message.model }})
+              </div>
+            </div>
+            <div v-if="message.sender === 'user'" class="user-avatar">You</div>
+          </div>
+        </div>
+        
+        <div class="ai-chat-input">
+          <textarea 
+            placeholder="Ask me anything about your project..."
+            rows="2"
+            v-model="aiChatInput"
+            @keydown.enter.prevent="sendAIChatMessage"
+          ></textarea>
+          <button 
+            class="send-button" 
+            @click="sendAIChatMessage" 
+            :disabled="!aiChatInput.trim()"
+          >
+            Send
+          </button>
+        </div>
       </div>
     </div>
     
@@ -185,6 +368,11 @@
         </div>
       </div>
     </div>
+    
+    <!-- Red indicator when chat is expanded -->
+    <div style="position: fixed; top: 10px; left: 10px; background: red; color: white; padding: 5px; z-index: 10000000; font-size: 12px;" v-if="aiChatExpanded">
+      AI CHAT IS OPEN
+    </div>
   </div>
 </template>
 
@@ -202,10 +390,14 @@ export default {
   },
   data() {
     return {
+      // CSRF Token for form submissions
+      csrfToken: document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+      
       // View Management
       currentView: 'gantt',
       showAppSwitcher: false,
       sidebarCollapsed: false,
+      aiChatExpanded: false,
       
       // Debug Panel
       showDebugPanel: false,
@@ -216,6 +408,23 @@ export default {
       isDraggingDebugPanel: false,
       debugPanelDragStart: { x: 0, y: 0 },
       debugPanelDragInitialPosition: { top: 0, left: 0 },
+      
+      // AI Chat Panel
+      aiChatPanelPosition: {
+        top: 100,
+        left: 100
+      },
+      isDraggingAIChatPanel: false,
+      aiChatPanelDragStart: { x: 0, y: 0 },
+      aiChatPanelDragInitialPosition: { top: 0, left: 0 },
+      aiChatDockPosition: 'free', // Possible values: 'free', 'north', 'south', 'east', 'west'
+      
+      // Task Bar Styling
+      detailTaskBarHeight: 25, // Default height from TaskBar.vue
+      
+      // AI Chat
+      aiChatInput: '',
+      aiChatMessages: [],
       
       // Task Management
       showDeleteConfirmModal: false,
@@ -544,6 +753,294 @@ export default {
       // Will be handled by the GanttChart component
     },
     
+    // AI Chat Controls
+    toggleAIChat() {
+      console.log('Toggling AI Chat');
+      this.aiChatExpanded = !this.aiChatExpanded;
+    },
+    
+    sendAIChatMessage() {
+      if (!this.aiChatInput.trim()) return;
+      
+      // Add user message
+      this.aiChatMessages.push({
+        sender: 'user',
+        content: this.aiChatInput.trim()
+      });
+      
+      const userMessage = this.aiChatInput.trim();
+      
+      // Clear input
+      this.aiChatInput = '';
+      
+      // Scroll to bottom
+      this.$nextTick(() => {
+        const messagesContainer = document.querySelector('.ai-chat-messages');
+        if (messagesContainer) {
+          messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+      });
+      
+      // Set loading state
+      const loadingId = Date.now();
+      let loadingContent = 'Thinking...';
+      
+      // If the message indicates task creation, provide more specific feedback
+      if (this.isTaskCreationRequest(userMessage)) {
+        loadingContent = 'Creating your project plan... This may take a minute.';
+      }
+      
+      const loadingMessage = {
+        id: loadingId,
+        sender: 'ai',
+        content: loadingContent,
+        loading: true
+      };
+      this.aiChatMessages.push(loadingMessage);
+      
+      // Send request to the API endpoint
+      fetch('/api/v1/ai_chat/message', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
+        },
+        body: JSON.stringify({
+          prompt: userMessage,
+          provider: 'auto', // Use auto to let the backend choose
+          model: null
+        })
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Server responded with ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+      })
+      .then(data => {
+        // Remove loading message
+        const index = this.aiChatMessages.findIndex(m => m.id === loadingId);
+        if (index !== -1) {
+          this.aiChatMessages.splice(index, 1);
+        }
+        
+        // Add AI response to messages
+        this.aiChatMessages.push({
+          sender: 'ai',
+          content: data.response,
+          provider: data.provider,
+          model: data.model,
+          action: data.action
+        });
+        
+        // Check if we need to refresh the tasks/gantt chart
+        if (data.action === 'refresh_tasks') {
+          console.log('Refreshing tasks after AI task creation');
+          // Force refresh after a short delay to ensure backend has completed transaction
+          setTimeout(() => {
+            this.fetchTasksFromServer();
+          }, 500); // 500ms delay
+        }
+        
+        // If there's an error in the response, log it
+        if (data.error) {
+          console.error('AI chat error:', data.error);
+        }
+        
+        // Scroll to bottom after receiving response
+        this.$nextTick(() => {
+          const messagesContainer = document.querySelector('.ai-chat-messages');
+          if (messagesContainer) {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+          }
+        });
+      })
+      .catch(error => {
+        console.error('Error sending message to AI:', error);
+        
+        // Remove loading message
+        const index = this.aiChatMessages.findIndex(m => m.id === loadingId);
+        if (index !== -1) {
+          this.aiChatMessages.splice(index, 1);
+        }
+        
+        // Add error message
+        this.aiChatMessages.push({
+          sender: 'ai',
+          content: 'Sorry, there was an error processing your request. Please try again later.',
+          error: true
+        });
+      });
+    },
+    
+    // Task data management
+    fetchTasksFromServer() {
+      console.log('Fetching tasks from server');
+      
+      // Make API call to get tasks
+      fetch('/api/v1/tasks')
+        .then(response => response.json())
+        .then(data => {
+          console.log('Received tasks from server:', data);
+          console.log(`API returned ${data.length} tasks`);
+          
+          // Count tasks with parent_id to verify hierarchy
+          const tasksWithParents = data.filter(task => task.parent_id).length;
+          console.log(`Tasks with parent_id: ${tasksWithParents}`);
+          
+          // Log all unique parent_ids to verify they exist
+          const uniqueParentIds = [...new Set(data.filter(task => task.parent_id).map(task => task.parent_id))];
+          console.log(`Unique parent_ids: ${uniqueParentIds.join(', ')}`);
+          
+          // Clear existing tasks and replace with server data
+          this.tasks = [];
+          
+          // Process tasks and rebuild hierarchy
+          if (Array.isArray(data)) {
+            // Group tasks by parent
+            const taskMap = {};
+            const rootTasks = [];
+            
+            // First pass: create task map
+            data.forEach(task => {
+              // Create a task object with our expected structure
+              const taskObj = {
+                id: task.id,
+                name: task.name,
+                description: task.description,
+                startDate: new Date(task.start_date),
+                endDate: new Date(task.due_date),
+                progress: task.percent_complete || 0,
+                expanded: true,
+                resources: task.assignee_id ? [task.assignee_id] : [],
+                status: task.status,
+                children: []
+              };
+              
+              taskMap[task.id] = taskObj;
+              
+              // If it doesn't have a parent, it's a root task
+              if (!task.parent_id) {
+                rootTasks.push(taskObj);
+              }
+            });
+            
+            // Second pass: build hierarchy
+            data.forEach(task => {
+              if (task.parent_id && taskMap[task.parent_id] && taskMap[task.id]) {
+                taskMap[task.parent_id].children.push(taskMap[task.id]);
+              }
+            });
+            
+            // Set the tasks array to the root tasks
+            this.tasks = rootTasks;
+            
+            console.log('Tasks rebuilt:', this.tasks);
+            console.log(`Built ${rootTasks.length} root tasks with hierarchical structure.`);
+            
+            // Additional debugging to check hierarchy
+            const countAllTasks = (tasks) => {
+              let count = tasks.length;
+              tasks.forEach(task => {
+                if (task.children && task.children.length) {
+                  count += countAllTasks(task.children);
+                }
+              });
+              return count;
+            };
+            const totalTaskCount = countAllTasks(rootTasks);
+            console.log(`Total tasks in hierarchy: ${totalTaskCount}`);
+            
+            // Force UI update to ensure everything rerenders
+            this.$nextTick(() => {
+              this.forceUpdate();
+            });
+          }
+          
+          // Fetch dependencies
+          this.fetchDependenciesFromServer();
+        })
+        .catch(error => {
+          console.error('Error fetching tasks:', error);
+        });
+    },
+    
+    fetchDependenciesFromServer() {
+      // Fetch dependencies from server
+      fetch('/api/v1/task_dependencies')
+        .then(response => response.json())
+        .then(data => {
+          console.log('Received dependencies from server:', data);
+          
+          // Clear existing dependencies and replace with server data
+          this.dependencies = [];
+          
+          // Process dependencies
+          if (Array.isArray(data)) {
+            this.dependencies = data.map(dep => ({
+              from: dep.task_id,
+              to: dep.dependent_task_id,
+              fromType: this.mapDependencyType(dep.dependency_type, 'start'),
+              toType: this.mapDependencyType(dep.dependency_type, 'end')
+            }));
+          }
+          
+          console.log('Dependencies rebuilt:', this.dependencies);
+          
+          // Force UI update after dependencies are loaded
+          this.$nextTick(() => {
+            this.forceUpdate();
+          });
+        })
+        .catch(error => {
+          console.error('Error fetching dependencies:', error);
+        });
+    },
+    
+    // Helper to map backend dependency types to frontend fromType/toType format
+    mapDependencyType(type, position) {
+      // Default to finish_to_start which is most common
+      const dependencyType = type || 'finish_to_start';
+      
+      // Map based on position (start or end) and dependency type
+      if (position === 'start') {
+        // Map to "from" side of dependency
+        switch (dependencyType) {
+          case 'finish_to_start': return 'end';
+          case 'start_to_start': return 'start';
+          case 'finish_to_finish': return 'end';
+          case 'start_to_finish': return 'start';
+          default: return 'end';
+        }
+      } else {
+        // Map to "to" side of dependency
+        switch (dependencyType) {
+          case 'finish_to_start': return 'start';
+          case 'start_to_start': return 'start';
+          case 'finish_to_finish': return 'end';
+          case 'start_to_finish': return 'end';
+          default: return 'start';
+        }
+      }
+    },
+    
+    // Helper to detect if a message is likely a task creation request
+    isTaskCreationRequest(message) {
+      if (!message) return false;
+      
+      const msgLower = message.toLowerCase();
+      
+      // Check for task creation patterns
+      const taskKeywords = ['task', 'project', 'plan', 'schedule', 'gantt', 'timeline'];
+      const createKeywords = ['create', 'generate', 'make', 'build', 'develop', 'setup'];
+      
+      // Check if at least one word from each category is in the message
+      const hasTaskKeyword = taskKeywords.some(word => msgLower.includes(word));
+      const hasCreateKeyword = createKeywords.some(word => msgLower.includes(word));
+      
+      return hasTaskKeyword && hasCreateKeyword;
+    },
+    
     // Resource Management
     addResource(resource) {
       this.resources.push(resource);
@@ -620,9 +1117,134 @@ export default {
       document.removeEventListener('mouseup', this.stopDragDebugPanel);
     },
     
+    // AI Chat Panel Dragging
+    startDragAIChatPanel(event) {
+      if (event.target.tagName === 'BUTTON' || event.target.tagName === 'INPUT') {
+        return;
+      }
+      
+      this.isDraggingAIChatPanel = true;
+      this.aiChatPanelDragStart = {
+        x: event.clientX,
+        y: event.clientY
+      };
+      
+      this.aiChatPanelDragInitialPosition = {
+        top: this.aiChatPanelPosition.top,
+        left: this.aiChatPanelPosition.left
+      };
+      
+      document.addEventListener('mousemove', this.dragAIChatPanel);
+      document.addEventListener('mouseup', this.stopDragAIChatPanel);
+    },
+    
+    dragAIChatPanel(event) {
+      if (!this.isDraggingAIChatPanel) return;
+      
+      const deltaX = event.clientX - this.aiChatPanelDragStart.x;
+      const deltaY = event.clientY - this.aiChatPanelDragStart.y;
+      
+      this.aiChatPanelPosition = {
+        top: Math.max(0, this.aiChatPanelDragInitialPosition.top + deltaY),
+        left: Math.max(0, this.aiChatPanelDragInitialPosition.left + deltaX)
+      };
+    },
+    
+    stopDragAIChatPanel() {
+      this.isDraggingAIChatPanel = false;
+      document.removeEventListener('mousemove', this.dragAIChatPanel);
+      document.removeEventListener('mouseup', this.stopDragAIChatPanel);
+      
+      // Auto-dock to edges if the panel is near an edge
+      this.autoDockAIChat();
+    },
+    
+    autoDockAIChat() {
+      const windowWidth = window.innerWidth;
+      const windowHeight = window.innerHeight;
+      const dockThreshold = 50; // px from the edge to trigger docking
+      
+      const left = this.aiChatPanelPosition.left;
+      const top = this.aiChatPanelPosition.top;
+      
+      // Check if near any edges
+      if (left < dockThreshold) {
+        this.dockAIChat('west');
+      } else if (left > windowWidth - 400 - dockThreshold) {
+        this.dockAIChat('east');
+      } else if (top < dockThreshold) {
+        this.dockAIChat('north');
+      } else if (top > windowHeight - 500 - dockThreshold) {
+        this.dockAIChat('south');
+      }
+    },
+    
+    dockAIChat(position) {
+      // Update the dock position
+      this.aiChatDockPosition = position;
+      
+      // If in free mode, we can adjust its initial position
+      if (position === 'free') {
+        // Set to center of screen if currently docked
+        if (this.aiChatDockPosition !== 'free') {
+          const windowWidth = window.innerWidth;
+          const windowHeight = window.innerHeight;
+          
+          this.aiChatPanelPosition = {
+            top: (windowHeight - 500) / 2,
+            left: (windowWidth - 400) / 2
+          };
+        }
+      }
+    },
+    
     forceUpdate() {
       // Force a UI refresh by creating a temporary copy
       this.resources = [...this.resources];
+    },
+    
+    // Methods for controlling task bar height
+    updateDetailBarHeight() {
+      // Create a custom style element or update it if it exists
+      let styleEl = document.getElementById('gantt-bar-styles');
+      if (!styleEl) {
+        styleEl = document.createElement('style');
+        styleEl.id = 'gantt-bar-styles';
+        document.head.appendChild(styleEl);
+      }
+      
+      // Set the custom CSS for the detail task bars
+      styleEl.textContent = `
+        .task-bar:not(.summary-task-bar) {
+          height: ${this.detailTaskBarHeight}px !important;
+        }
+        
+        .task-bar:not(.summary-task-bar) .task-bar-content {
+          height: ${this.detailTaskBarHeight}px !important;
+        }
+        
+        /* Update connection points vertical positioning */
+        .connection-point {
+          top: ${this.detailTaskBarHeight / 2}px;
+        }
+      `;
+      
+      // Force a UI refresh
+      this.forceUpdate();
+    },
+    
+    resetBarHeights() {
+      // Reset to default values
+      this.detailTaskBarHeight = 25;
+      
+      // Remove the custom style element
+      const styleEl = document.getElementById('gantt-bar-styles');
+      if (styleEl) {
+        styleEl.remove();
+      }
+      
+      // Force a UI refresh
+      this.forceUpdate();
     }
   }
 }
@@ -667,10 +1289,30 @@ body {
   font-weight: 600;
 }
 
-.app-controls {
+.app-left-controls {
   display: flex;
   align-items: center;
   gap: 15px;
+}
+
+.app-right-controls {
+  display: flex;
+  align-items: center;
+}
+
+.logout-button {
+  background-color: #6699CC;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.logout-button:hover {
+  background-color: #003366;
 }
 
 .debug-button {
@@ -784,9 +1426,11 @@ body {
   background-color: #f8f9fa;
   border-right: 1px solid #e1e4e8;
   padding: 15px 0;
-  overflow-y: auto;
   position: relative;
   transition: width 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .nav-sidebar.collapsed {
@@ -820,6 +1464,19 @@ body {
   transform: scale(1.05);
 }
 
+/* Sidebar Navigation Sections */
+.nav-items-container {
+  flex: 1;
+  overflow-y: auto;
+  padding-top: 10px;
+}
+
+.sidebar-footer {
+  padding: 10px 0;
+  border-top: 1px solid #e1e4e8;
+  margin-top: auto;
+}
+
 .nav-item {
   display: flex;
   align-items: center;
@@ -844,6 +1501,21 @@ body {
 .nav-item.disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.nav-item.ai-item {
+  color: #6699CC;
+  font-weight: 500;
+}
+
+.nav-item.ai-item:hover {
+  background-color: #e6f0ff;
+}
+
+.nav-item.ai-item.ai-active {
+  background-color: #e6f0ff;
+  color: #2b6cb0;
+  font-weight: 500;
 }
 
 .nav-icon {
@@ -871,8 +1543,10 @@ body {
 .content-area {
   display: flex;
   flex-direction: column;
+  flex: 1;
   overflow: hidden;
   margin-right: 2px; /* Small margin to prevent content from being cut off */
+  height: calc(100vh - 50px); /* Full height minus header */
 }
 
 /* Workspace Toolbar */
@@ -883,6 +1557,9 @@ body {
   padding: 12px 16px;
   background-color: #f8f9fa;
   border-bottom: 1px solid #e1e4e8;
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 
 .toolbar-left, .toolbar-right {
@@ -918,10 +1595,11 @@ body {
 /* Workspace Content */
 .workspace-content {
   flex: 1;
-  overflow: hidden;
+  overflow: visible; /* Changed from hidden to visible */
   position: relative;
   box-sizing: border-box;
   width: 100%;
+  height: calc(100% - 48px); /* Subtract toolbar height */
 }
 
 /* ===== Debug Panel ===== */
@@ -1002,6 +1680,309 @@ body {
 
 .debug-info p {
   margin: 4px 0;
+}
+
+.debug-control {
+  margin-bottom: 12px;
+}
+
+.debug-input-group {
+  display: flex;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.debug-input-group input[type="range"] {
+  flex: 1;
+  margin-right: 8px;
+}
+
+.debug-value {
+  min-width: 40px;
+  font-family: monospace;
+  text-align: right;
+}
+
+.btn-debug-action {
+  background-color: #6699CC;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+.btn-debug-action:hover {
+  background-color: #003366;
+}
+
+/* ===== AI Chat Panel ===== */
+.ai-chat-panel {
+  position: fixed;
+  width: 400px;
+  height: 500px;
+  background-color: white;
+  border: 3px solid #6699CC;
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  z-index: 9999;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s ease;
+}
+
+/* Docked states */
+.ai-chat-panel.docked {
+  border-radius: 0;
+}
+
+.ai-chat-panel.dock-north {
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 300px;
+  border-radius: 0 0 10px 10px;
+}
+
+.ai-chat-panel.dock-south {
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 300px;
+  border-radius: 10px 10px 0 0;
+}
+
+.ai-chat-panel.dock-east {
+  top: 0;
+  right: 0;
+  width: 350px;
+  height: 100%;
+  border-radius: 10px 0 0 10px;
+}
+
+.ai-chat-panel.dock-west {
+  top: 0;
+  left: 0;
+  width: 350px;
+  height: 100%;
+  border-radius: 0 10px 10px 0;
+}
+
+.ai-chat-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 15px;
+  background-color: #6699CC;
+  color: white;
+  border-bottom: 1px solid #5588BB;
+  user-select: none;
+}
+
+.ai-chat-panel-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.ai-chat-panel-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dock-controls {
+  display: flex;
+  gap: 5px;
+}
+
+.dock-button {
+  width: 24px;
+  height: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background-color: rgba(255, 255, 255, 0.2);
+  color: white;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  padding: 0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.dock-button:hover {
+  background-color: rgba(255, 255, 255, 0.3);
+}
+
+.dock-button.active {
+  background-color: rgba(255, 255, 255, 0.4);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+.ai-chat-panel-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  padding: 0;
+}
+
+.ai-chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background-color: #f9f9f9;
+}
+
+.message {
+  display: flex;
+  max-width: 80%;
+  align-items: flex-start;
+}
+
+.user-message {
+  margin-left: auto;
+  flex-direction: row-reverse;
+}
+
+.ai-avatar, .user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.ai-avatar {
+  background-color: #6699CC;
+  margin-right: 8px;
+}
+
+.user-avatar {
+  background-color: #4CAF50;
+  margin-left: 8px;
+}
+
+.message-content {
+  padding: 10px 14px;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.ai-message .message-content {
+  background-color: white;
+}
+
+.user-message .message-content {
+  background-color: #E7F5E8;
+}
+
+.message-content p {
+  margin: 0;
+  line-height: 1.4;
+}
+
+.ai-chat-input {
+  display: flex;
+  padding: 12px;
+  border-top: 1px solid #eee;
+  background-color: white;
+}
+
+.ai-chat-input textarea {
+  flex: 1;
+  border: 1px solid #ddd;
+  border-radius: 20px;
+  padding: 10px 14px;
+  font-family: inherit;
+  resize: none;
+  outline: none;
+  margin-right: 8px;
+}
+
+.ai-chat-input textarea:focus {
+  border-color: #6699CC;
+}
+
+.send-button {
+  min-width: 60px;
+  height: 36px;
+  border-radius: 18px;
+  background-color: #6699CC;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s ease;
+}
+
+.send-button:hover {
+  background-color: #5588BB;
+}
+
+.send-button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+/* Loading animation */
+.loading-dots span {
+  animation: loading 1.4s infinite;
+  display: inline-block;
+  opacity: 0;
+}
+
+.loading-dots span:nth-child(1) {
+  animation-delay: 0.2s;
+}
+
+.loading-dots span:nth-child(2) {
+  animation-delay: 0.4s;
+}
+
+.loading-dots span:nth-child(3) {
+  animation-delay: 0.6s;
+}
+
+@keyframes loading {
+  0% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Error message styling */
+.error-message .message-content {
+  background-color: #FFEBEE !important;
+  color: #D32F2F;
+}
+
+/* Message metadata */
+.message-meta {
+  font-size: 0.7rem;
+  color: #888;
+  margin-top: 4px;
+  font-style: italic;
 }
 
 .btn-danger {

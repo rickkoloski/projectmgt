@@ -9,6 +9,7 @@
       class="task-bar-content"
       :class="{ 'summary-task': isSummaryTask }"
       :style="{ backgroundColor: getTaskColor() }"
+      :title="task.description || task.name"
     >
       <div class="task-bar-progress" :style="{ width: `${task.progress}%` }"></div>
       <div class="task-bar-label">{{ task.name }}</div>
@@ -108,8 +109,8 @@ export default {
       const rowIndex = typeof this.task.rowIndex === 'number' ? this.task.rowIndex : 0;
       
       // Summary tasks have different height and vertical positioning
-      const height = this.isSummaryTask ? '20px' : '30px';
-      const top = `${36 * rowIndex + (this.isSummaryTask ? 5 : 0)}px`; // Center summary tasks vertically
+      const height = this.isSummaryTask ? '20px' : '25px';
+      const top = `${36 * rowIndex + (this.isSummaryTask ? 5 : 3)}px`; // Center tasks vertically
       
       return {
         left: `${left}px`,
