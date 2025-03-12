@@ -82,7 +82,7 @@ module Api
           model = ENV.fetch('OLLAMA_DEFAULT_MODEL', model_names.first)
           
           # Specific prompt for task generation - make it very explicit
-          system_message = "You are a project management assistant that helps create structured project plans. Your task is to parse the user's request and generate a complete project plan with tasks, subtasks, dates, and dependencies. Create descriptive task names that are specific and action-oriented. Provide detailed task descriptions that explain what work needs to be done. YOU MUST RESPOND WITH VALID JSON ONLY. DO NOT PROVIDE EXPLANATIONS OR TEXT BEFORE OR AFTER THE JSON."
+          system_message = "You are a Harmoniq assistant that helps create structured project plans. Your task is to parse the user's request and generate a complete project plan with tasks, subtasks, dates, and dependencies. Create descriptive task names that are specific and action-oriented. Provide detailed task descriptions that explain what work needs to be done. YOU MUST RESPOND WITH VALID JSON ONLY. DO NOT PROVIDE EXPLANATIONS OR TEXT BEFORE OR AFTER THE JSON."
           
           # Task generation instructions
           instructions = <<~INSTRUCTIONS
@@ -243,7 +243,7 @@ module Api
         model_names.each do |model_name|
           begin
             # Format per Ollama API docs: https://github.com/ollama/ollama/blob/main/docs/api.md
-            system_message = "You are a helpful assistant for a project management application. Provide concise, practical advice about project management features. Keep responses under 150 words.\n\nThis is a project management app with features including Gantt charts, task boards, and resource management. Users can create tasks, set deadlines, track dependencies, and assign resources to tasks."
+            system_message = "You are a helpful assistant for Harmoniq, a platform that orchestrates distributed collaborations through harmonized workstreams. Provide concise, practical advice about the project management features. Keep responses under 150 words.\n\nHarmoniq Project Management includes features like Gantt charts, task boards, and resource management. Users can create tasks, set deadlines, track dependencies, and assign resources to tasks."
             
             # Full prompt with system message
             full_prompt = "#{system_message}\n\nUser: #{prompt}\nAssistant:"
@@ -299,9 +299,9 @@ module Api
         prompt_lower = prompt.downcase
         
         if prompt_lower.include?('what') && (prompt_lower.include?('app') || prompt_lower.include?('application'))
-          return "This is a project management application that helps you organize tasks, track deadlines, and collaborate with team members. It includes features like Gantt charts for timeline visualization, task boards for kanban-style workflows, and resource management tools."
+          return "This is Harmoniq, a platform that orchestrates distributed collaborations through harmonized workstreams. Harmoniq Project Management helps you organize tasks, track deadlines, and collaborate with team members. It includes features like Gantt charts for timeline visualization, task boards for kanban-style workflows, and resource management tools."
         elsif prompt_lower.include?('hello') || prompt_lower.include?('hi') || prompt_lower.match?(/^hey/)
-          return "Hello! I'm your project management assistant. How can I help you today?"
+          return "Hello! I'm your Harmoniq assistant. How can I help you today?"
         elsif prompt_lower.include?('task') && (prompt_lower.include?('create') || prompt_lower.include?('add') || prompt_lower.include?('new'))
           return "To create a new task, click the 'Add Task' button in the toolbar above the workspace. You can then enter the task details, set deadlines, and assign resources."
         elsif prompt_lower.include?('gantt')

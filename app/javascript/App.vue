@@ -38,7 +38,7 @@
           </div>
         </div>
         <div class="app-title">
-          <h1>Project Management</h1>
+          <h1>Harmoniq Project Management</h1>
         </div>
       </div>
       
@@ -315,15 +315,15 @@
       <div class="ai-chat-panel-content">
         <div class="ai-chat-messages">
           <div class="ai-message">
-            <div class="ai-avatar">AI</div>
+            <div class="ai-avatar">H</div>
             <div class="message-content">
-              <p>Hello! I'm your project assistant. Ask me about tasks, suggest project improvements, or get help with planning.</p>
+              <p>Hello! I'm your Harmoniq assistant. Ask me about tasks, suggest project improvements, or get help with orchestrating your workstreams.</p>
             </div>
           </div>
           
           <div v-for="(message, index) in aiChatMessages" :key="index" 
                :class="['message', message.sender === 'ai' ? 'ai-message' : 'user-message', message.loading ? 'loading-message' : '', message.error ? 'error-message' : '']">
-            <div v-if="message.sender === 'ai'" class="ai-avatar">AI</div>
+            <div v-if="message.sender === 'ai'" class="ai-avatar">H</div>
             <div class="message-content">
               <p v-if="!message.loading">{{ message.content }}</p>
               <p v-else class="loading-dots">Thinking<span>.</span><span>.</span><span>.</span></p>

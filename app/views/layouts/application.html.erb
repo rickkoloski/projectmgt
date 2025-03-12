@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Project Management</title>
+    <title>Harmoniq</title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
@@ -16,11 +16,54 @@
 
     <%# Includes all stylesheet files in app/assets/stylesheets %>
     <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
-    <%= javascript_include_tag "application", defer: true %>
+    
+    <%# Include Vue app - full app for dashboard, AI chat only for other pages %>
+    <% if controller_name == 'gantt' && current_user.present? %>
+      <%# Full Vue app for dashboard %>
+      <%= javascript_include_tag "application", defer: true %>
+    <% elsif current_user.present? %>
+      <%# AI chat component for other authenticated pages %>
+      <%= javascript_include_tag "ai_chat", defer: true %>
+    <% end %>
+    
+    <style>
+      html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        overflow: hidden; /* Default to hidden for app pages */
+      }
+      
+      body {
+        min-height: 100%;
+        position: relative;
+      }
+      
+      /* We'll add a specific class for non-app pages */
+      body.allow-scroll {
+        overflow-y: auto;
+      }
+    </style>
   </head>
 
-  <body>
-    <div id="app"></div>
-    <%= yield %>
+  <body class="<%= controller_name.in?(['sessions', 'users']) || (controller_name == 'gantt' && !current_user.present?) ? 'allow-scroll' : '' %>">
+    <% if controller_name == 'gantt' && current_user.present? %>
+      <%# For app dashboard, include the complete Vue app %>
+      <div id="main-app">
+        <%# This will be replaced by Vue, but ensures the logout button is available before Vue loads %>
+        <div id="fallback-header" style="display: flex; justify-content: flex-end; padding: 10px 20px; background-color: #fff; border-bottom: 1px solid #e1e4e8;">
+          <%= button_to "Logout", logout_path, method: :delete, class: "logout-button", style: "background-color: #6699CC; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;" %>
+        </div>
+      </div>
+      <%= yield %>
+    <% else %>
+      <%# For all other pages, show regular content with AI chat %>
+      <%= yield %>
+      
+      <% if current_user.present? %>
+        <%# Add AI chat component container for logged-in users on all pages %>
+        <div id="ai-chat-app"></div>
+      <% end %>
+    <% end %>
   </body>
 </html>

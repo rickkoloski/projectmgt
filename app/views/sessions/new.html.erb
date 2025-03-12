@@ -1,6 +1,6 @@
 <div class="login-container">
   <div class="login-card">
-    <h2>Log In</h2>
+    <h2>Log In to Harmoniq</h2>
     
     <%= form_with(url: login_path, method: :post, class: "login-form") do |form| %>
       <div class="form-group">
@@ -25,6 +25,10 @@
 </div>
 
 <style>
+  body {
+    background-color: #f0f4f8;
+  }
+  
   .login-container {
     display: flex;
     justify-content: center;
@@ -36,16 +40,18 @@
   .login-card {
     background-color: white;
     border-radius: 8px;
-    padding: 30px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    padding: 35px;
+    box-shadow: 0 8px 16px rgba(0, 51, 102, 0.1);
     width: 100%;
     max-width: 400px;
+    border-top: 4px solid #6699CC;
   }
   
   .login-card h2 {
     text-align: center;
     margin-bottom: 24px;
-    color: #4f46e5;
+    color: #003366;
+    font-weight: 600;
   }
   
   .login-form {
@@ -60,24 +66,26 @@
     display: block;
     margin-bottom: 8px;
     font-weight: 500;
+    color: #000044;
   }
   
   .form-control {
     width: 100%;
-    padding: 10px;
-    border: 1px solid #d1d5db;
+    padding: 12px;
+    border: 1px solid #C0C0C0;
     border-radius: 6px;
     font-size: 16px;
+    transition: all 0.2s;
   }
   
   .form-control:focus {
     outline: none;
-    border-color: #4f46e5;
-    box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
+    border-color: #6699CC;
+    box-shadow: 0 0 0 2px rgba(102, 153, 204, 0.2);
   }
   
   .form-actions {
-    margin-top: 24px;
+    margin-top: 28px;
   }
   
   .btn {
@@ -90,29 +98,36 @@
     cursor: pointer;
     font-size: 16px;
     width: 100%;
+    transition: all 0.3s ease;
   }
   
   .btn-primary {
-    background-color: #4f46e5;
+    background-color: #6699CC;
     color: white;
+    box-shadow: 0 2px 4px rgba(0, 51, 102, 0.1);
   }
   
   .btn-primary:hover {
-    background-color: #4338ca;
+    background-color: #003366;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 51, 102, 0.2);
   }
   
   .login-footer {
     text-align: center;
-    margin-top: 24px;
-    color: #6b7280;
+    margin-top: 28px;
+    color: #000044;
+    opacity: 0.7;
   }
   
   .login-footer a {
-    color: #4f46e5;
+    color: #6699CC;
     text-decoration: none;
+    font-weight: 500;
   }
   
   .login-footer a:hover {
     text-decoration: underline;
+    color: #003366;
   }
 </style>
