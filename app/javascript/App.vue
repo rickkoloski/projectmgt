@@ -61,34 +61,75 @@
       <aside class="nav-sidebar" :class="{ 'collapsed': sidebarCollapsed }">
         <!-- Toggle Button -->
         <div class="sidebar-toggle" @click="toggleSidebar">
-          <span v-if="sidebarCollapsed">→</span>
-          <span v-else>←</span>
+          <span v-if="sidebarCollapsed">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m9 18 6-6-6-6"></path>
+            </svg>
+          </span>
+          <span v-else>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m15 18-6-6 6-6"></path>
+            </svg>
+          </span>
         </div>
         
         <!-- Main Navigation Items -->
         <div class="nav-items-container">
           <a href="/dashboard" class="nav-item" :title="sidebarCollapsed ? 'Home Dashboard' : ''">
-            <span class="nav-icon">🏠</span>
+            <span class="nav-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                <polyline points="9 22 9 12 15 12 15 22"></polyline>
+              </svg>
+            </span>
             <span class="nav-label" v-if="!sidebarCollapsed">Home</span>
           </a>
           <div class="nav-item" :class="{ active: currentView === 'gantt' }" @click="switchView('gantt')" :title="sidebarCollapsed ? 'Gantt' : ''">
-            <span class="nav-icon">📊</span>
+            <span class="nav-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect width="6" height="20" x="4" y="2" rx="2"></rect>
+                <rect width="6" height="14" x="14" y="8" rx="2"></rect>
+              </svg>
+            </span>
             <span class="nav-label" v-if="!sidebarCollapsed">Gantt</span>
           </div>
           <div class="nav-item" :class="{ active: currentView === 'board' }" @click="switchView('board')" :title="sidebarCollapsed ? 'Board' : ''">
-            <span class="nav-icon">📋</span>
+            <span class="nav-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect width="18" height="18" x="3" y="3" rx="2"></rect>
+                <path d="M3 9h18"></path>
+                <path d="M9 21V9"></path>
+              </svg>
+            </span>
             <span class="nav-label" v-if="!sidebarCollapsed">Board</span>
           </div>
           <div class="nav-item" :class="{ active: currentView === 'resources' }" @click="switchView('resources')" :title="sidebarCollapsed ? 'Resources' : ''">
-            <span class="nav-icon">👥</span>
+            <span class="nav-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+              </svg>
+            </span>
             <span class="nav-label" v-if="!sidebarCollapsed">Resources</span>
           </div>
           <div class="nav-item disabled" :title="sidebarCollapsed ? 'Reports (Coming Soon)' : ''">
-            <span class="nav-icon">📈</span>
+            <span class="nav-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 3v18h18"></path>
+                <path d="m19 9-5 5-4-4-3 3"></path>
+              </svg>
+            </span>
             <span class="nav-label" v-if="!sidebarCollapsed">Reports</span>
           </div>
           <div class="nav-item disabled" :title="sidebarCollapsed ? 'Settings (Coming Soon)' : ''">
-            <span class="nav-icon">⚙️</span>
+            <span class="nav-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+            </span>
             <span class="nav-label" v-if="!sidebarCollapsed">Settings</span>
           </div>
         </div>
@@ -101,7 +142,13 @@
             :title="sidebarCollapsed ? 'AI Assistant' : ''"
             :class="{ 'ai-active': aiChatExpanded }"
           >
-            <span class="nav-icon">💬</span>
+            <span class="nav-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                <path d="M14 9.5a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z"></path>
+                <path d="M17 9.5c-.5-1.5-1.79-2.5-3.5-2.5s-3 1-3.5 2.5"></path>
+              </svg>
+            </span>
             <span class="nav-label" v-if="!sidebarCollapsed">AI Assistant</span>
           </div>
         </div>
@@ -459,87 +506,8 @@ export default {
       selectedDependencyIndex: -1,
       
       // Application Data
-      tasks: [
-        {
-          id: 1,
-          name: 'Project Planning',
-          startDate: new Date(2025, 2, 1),
-          endDate: new Date(2025, 2, 15),
-          progress: 60,
-          expanded: true,
-          resources: [1],
-          status: 'inProgress',
-          children: [
-            {
-              id: 2,
-              name: 'Requirements Analysis',
-              startDate: new Date(2025, 2, 1),
-              endDate: new Date(2025, 2, 5),
-              progress: 100,
-              resources: [1, 2],
-              status: 'done',
-              children: []
-            },
-            {
-              id: 3,
-              name: 'Design Planning',
-              startDate: new Date(2025, 2, 6),
-              endDate: new Date(2025, 2, 10),
-              progress: 80,
-              resources: [2, 3],
-              status: 'review',
-              children: []
-            },
-            {
-              id: 4,
-              name: 'Resource Allocation',
-              startDate: new Date(2025, 2, 11),
-              endDate: new Date(2025, 2, 15),
-              progress: 30,
-              resources: [1],
-              status: 'inProgress',
-              children: []
-            }
-          ]
-        },
-        {
-          id: 5,
-          name: 'Implementation',
-          startDate: new Date(2025, 2, 16),
-          endDate: new Date(2025, 3, 15),
-          progress: 10,
-          expanded: true,
-          resources: [4],
-          status: 'todo',
-          children: [
-            {
-              id: 6,
-              name: 'Frontend Development',
-              startDate: new Date(2025, 2, 16),
-              endDate: new Date(2025, 2, 31),
-              progress: 20,
-              resources: [2, 4],
-              status: 'todo',
-              children: []
-            },
-            {
-              id: 7,
-              name: 'Backend Development',
-              startDate: new Date(2025, 3, 1),
-              endDate: new Date(2025, 3, 15),
-              progress: 0,
-              resources: [3, 5],
-              status: 'backlog',
-              children: []
-            }
-          ]
-        }
-      ],
-      dependencies: [
-        { from: 2, to: 3, fromType: 'end', toType: 'start' },
-        { from: 6, to: 7, fromType: 'end', toType: 'start' },
-        { from: 3, to: 4, fromType: 'end', toType: 'start' }
-      ],
+      tasks: [], // Start with empty array, will be filled by API call
+      dependencies: [], // Start with empty array, will be filled by API call
       resources: [
         { 
           id: 1, 
@@ -1735,6 +1703,7 @@ body {
   flex: 1;
   overflow-y: auto;
   padding-top: 10px;
+  padding-bottom: 60px; /* Add padding to make room for the fixed footer */
 }
 
 .sidebar-footer {
@@ -1742,10 +1711,18 @@ body {
   border-top: 1px solid #e1e4e8;
   margin-top: auto;
   width: 100%;
-  position: sticky;
+  position: fixed;
   bottom: 0;
+  left: 0;
   background-color: #f8f9fa;
-  z-index: 5;
+  z-index: 1001;
+  width: 220px; /* Match the sidebar width */
+  transition: width 0.3s ease; /* Match the sidebar transition */
+}
+
+/* Ensure the footer width matches the sidebar when collapsed */
+.nav-sidebar.collapsed .sidebar-footer {
+  width: 60px;
 }
 
 .nav-item {
@@ -1803,10 +1780,12 @@ body {
 }
 
 .nav-icon {
-  font-size: 18px;
   display: flex;
   align-items: center;
+  justify-content: center;
   margin-right: 12px;
+  width: 24px;
+  height: 24px;
 }
 
 .collapsed .nav-icon {
