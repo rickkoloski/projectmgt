@@ -41,7 +41,7 @@
     </script>
     
     <%# Load external header cleanup script %>
-    <script src="/assets/header_cleanup.js"></script>
+    <%= javascript_include_tag "header_cleanup" %>
     
     <%# Include Vue app - full app for dashboard, gantt, and projects %>
     <% if (controller_name == 'gantt' || controller_name == 'dashboard' || controller_name == 'projects') && current_user.present? %>
@@ -65,13 +65,37 @@
       }
       
       body {
-        min-height: 100%;
+        min-height: 100vh;
         position: relative;
+        display: flex;
+        flex-direction: column;
       }
       
       /* We'll add a specific class for non-app pages */
       body.allow-scroll {
         overflow-y: auto;
+      }
+      
+      /* Footer Styles */
+      .app-footer {
+        background-color: #f5f5f5;
+        border-top: 1px solid #e0e0e0;
+        padding: 10px 0;
+        text-align: center;
+        font-size: 12px;
+        color: #666;
+        width: 100%;
+        margin-top: auto;
+      }
+      
+      .footer-content {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 20px;
+      }
+      
+      .app-footer p {
+        margin: 0;
       }
     </style>
   </head>
@@ -168,6 +192,15 @@
         <%# Add AI chat component container for logged-in users on non-project pages %>
         <div id="ai-chat-app"></div>
       <% end %>
+    <% end %>
+    
+    <% unless controller_name == 'dashboard' %>
+      <%# Add footer if not already on dashboard (which has its own footer) %>
+      <footer class="app-footer">
+        <div class="footer-content">
+          <p>&copy; <%= Date.today.year %> Harmoniq by Little Valley Tech. All rights reserved.</p>
+        </div>
+      </footer>
     <% end %>
   </body>
 </html>

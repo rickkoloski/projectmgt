@@ -83,16 +83,57 @@ class ProjectsController < ApplicationController
   end
   
   def update
-    if @project.update(project_params)
-      redirect_to project_path(@project), notice: 'Project was successfully updated.'
+    # Check if this is a request from the dashboard's edit form
+    if params[:project_id].present?
+      # This is coming from our dashboard edit form
+      @project = Project.find(params[:project_id])
+      
+      # Only update specific fields from the dashboard form
+      if @project.update(
+        name: params[:project_name],
+        status: params[:status],
+        start_date: params[:start_date],
+        end_date: params[:end_date]
+      )
+        redirect_to dashboard_path, notice: 'Project was successfully updated.'
+      else
+        redirect_to dashboard_path, alert: "Failed to update project: #{@project.errors.full_messages.join(', ')}"
+      end
     else
-      render :edit
+      # Regular edit form submission
+      if @project.update(project_params)
+        redirect_to project_path(@project), notice: 'Project was successfully updated.'
+      else
+        render :edit
+      end
     end
   end
   
   def destroy
-    @project.destroy
-    redirect_to projects_path, notice: 'Project was successfully deleted.'
+    # Standard RESTful destroy action that uses the before_action
+    if @project.destroy
+      respond_to do |format|
+        format.html do
+          if request.referer&.include?('dashboard')
+            redirect_to dashboard_path, notice: 'Project was successfully deleted.'
+          else
+            redirect_to projects_path, notice: 'Project was successfully deleted.'
+          end
+        end
+        format.json { render json: { success: true, message: 'Project was successfully deleted.' }, status: :ok }
+      end
+    else
+      respond_to do |format|
+        format.html do
+          if request.referer&.include?('dashboard')
+            redirect_to dashboard_path, alert: 'Failed to delete project.'
+          else
+            redirect_to projects_path, alert: 'Failed to delete project.'
+          end
+        end
+        format.json { render json: { success: false, errors: @project.errors.full_messages }, status: :unprocessable_entity }
+      end
+    end
   end
   
   private
