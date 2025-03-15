@@ -1,6 +1,6 @@
-# This file is auto-generated from the current state of the database.
-# Instead of editing this file, please use the migrations to incrementally modify your database,
-# and then regenerate this schema definition.
+# This file is auto-generated from the current state of the database. Instead
+# of editing this file, please use the migrations feature of Active Record to
+# incrementally modify your database, and then regenerate this schema definition.
 #
 # This file is the source Rails uses to define your schema when running `bin/rails
 # db:schema:load`. When creating a new database, `bin/rails db:schema:load` tends to
@@ -10,9 +10,27 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_03_10_030900) do
+ActiveRecord::Schema[8.0].define(version: 2025_03_15_041506) do
+  create_schema "auth"
+  create_schema "extensions"
+  create_schema "graphql"
+  create_schema "graphql_public"
+  create_schema "pgbouncer"
+  create_schema "pgsodium"
+  create_schema "pgsodium_masks"
+  create_schema "realtime"
+  create_schema "storage"
+  create_schema "vault"
+
   # These are extensions that must be enabled in order to support this database
-  enable_extension "plpgsql"
+  enable_extension "extensions.pg_stat_statements"
+  enable_extension "extensions.pgcrypto"
+  enable_extension "extensions.pgjwt"
+  enable_extension "extensions.uuid-ossp"
+  enable_extension "graphql.pg_graphql"
+  enable_extension "pg_catalog.plpgsql"
+  enable_extension "pgsodium.pgsodium"
+  enable_extension "vault.supabase_vault"
 
   create_table "external_notifications", force: :cascade do |t|
     t.string "recipient_email"
@@ -104,6 +122,10 @@ ActiveRecord::Schema[8.0].define(version: 2025_03_10_030900) do
     t.jsonb "metadata"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.integer "gantt_order"
+    t.integer "board_order"
+    t.index ["project_id", "gantt_order"], name: "index_tasks_on_project_id_and_gantt_order"
+    t.index ["project_id", "status", "board_order"], name: "index_tasks_on_project_id_and_status_and_board_order"
     t.index ["project_id"], name: "index_tasks_on_project_id"
   end
 

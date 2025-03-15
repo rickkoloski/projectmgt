@@ -5,7 +5,7 @@ module Api
       
       # Skip authentication and CSRF protection temporarily for testing
       # before_action :authenticate_user!
-      skip_before_action :verify_authenticity_token, only: [:replace_all]
+      skip_before_action :verify_authenticity_token, only: [:replace_all, :reorder_gantt, :reorder_board]
       
       # GET /api/v1/tasks
       def index
@@ -13,6 +13,17 @@ module Api
         if params[:project_id].present?
           @tasks = Task.includes(:project, :creator, :assignee, :parent)
                       .where(project_id: params[:project_id])
+                      
+          # Apply ordering based on view parameter
+          case params[:view]
+          when 'gantt'
+            @tasks = @tasks.order(:gantt_order)
+          when 'board'
+            @tasks = @tasks.order(:status, :board_order)
+          else
+            # Default to gantt ordering
+            @tasks = @tasks.order(:gantt_order)
+          end
         else
           # Get all tasks and include necessary associations
           @tasks = Task.includes(:project, :creator, :assignee, :parent).all
@@ -49,7 +60,7 @@ module Api
             
             # Create new tasks
             @tasks = []
-            params[:tasks].each do |task_data|
+            params[:tasks].each_with_index do |task_data, index|
               task = Task.create!(
                 name: task_data[:name],
                 description: task_data[:description],
@@ -60,7 +71,9 @@ module Api
                 project_id: task_data[:project_id],
                 parent_id: task_data[:parent_id],
                 creator_id: current_user&.id || 1,
-                assignee_id: task_data[:assignee_id]
+                assignee_id: task_data[:assignee_id],
+                gantt_order: index + 1,
+                board_order: task_data[:board_order] # Will be set automatically if nil
               )
               @tasks << task
             end
@@ -80,6 +93,92 @@ module Api
           render json: { tasks: @tasks, message: "Successfully replaced all tasks" }, status: :ok
         rescue => e
           render json: { error: "Failed to replace tasks: #{e.message}" }, status: :unprocessable_entity
+        end
+      end
+      
+      # POST /api/v1/tasks/reorder_gantt
+      def reorder_gantt
+        project_id = params[:project_id]
+        task_id = params[:task_id]
+        new_position = params[:position]
+        
+        Rails.logger.info "Reordering task: project_id=#{project_id}, task_id=#{task_id}, new_position=#{new_position}"
+        
+        unless project_id.present? && task_id.present? && new_position.present?
+          Rails.logger.error "Missing required parameters"
+          render json: { error: "Missing required parameters" }, status: :bad_request
+          return
+        end
+        
+        # Parse parameters to integers
+        project_id = project_id.to_i
+        task_id = task_id.to_i
+        new_position = new_position.to_i
+        
+        # The frontend sends a 0-based index, but our database uses 1-based indices
+        # Add 1 to properly align with the database's expectation
+        adjusted_position = new_position + 1
+        
+        Rails.logger.info "Reordering task (parsed as integers): project_id=#{project_id}, task_id=#{task_id}, new_position=#{new_position}, adjusted_position=#{adjusted_position}"
+        
+        Rails.logger.info "About to call Task.reorder_gantt with position: #{adjusted_position}"
+        
+        # Capture current gantt order for logging
+        original_tasks = Task.where(project_id: project_id).order(:gantt_order)
+        Rails.logger.info "Original task order: #{original_tasks.map { |t| { id: t.id, name: t.name, order: t.gantt_order } }.inspect}"
+        
+        reorder_result = Task.reorder_gantt(project_id, task_id, adjusted_position)
+        Rails.logger.info "Task.reorder_gantt returned: #{reorder_result}"
+        
+        if reorder_result
+          # Return the updated task list in order
+          @tasks = Task.where(project_id: project_id).order(:gantt_order)
+          
+          # Log the new order for debugging
+          Rails.logger.info "Updated task order: #{@tasks.map { |t| { id: t.id, name: t.name, order: t.gantt_order } }.inspect}"
+          
+          render json: @tasks
+        else
+          Rails.logger.error "Failed to reorder tasks"
+          render json: { error: "Failed to reorder tasks" }, status: :unprocessable_entity
+        end
+      end
+      
+      # POST /api/v1/tasks/reorder_board
+      def reorder_board
+        project_id = params[:project_id]
+        task_id = params[:task_id]
+        new_position = params[:position]
+        status = params[:status]
+        
+        Rails.logger.info "Reordering board task: project_id=#{project_id}, task_id=#{task_id}, new_position=#{new_position}, status=#{status}"
+        
+        unless project_id.present? && task_id.present? && new_position.present?
+          Rails.logger.error "Missing required parameters"
+          render json: { error: "Missing required parameters" }, status: :bad_request
+          return
+        end
+        
+        # Parse parameters to integers
+        project_id = project_id.to_i
+        task_id = task_id.to_i
+        new_position = new_position.to_i
+        
+        # The frontend sends a 0-based index, but our database uses 1-based indices
+        # Add 1 to properly align with the database's expectation
+        adjusted_position = new_position + 1
+        
+        Rails.logger.info "Reordering board task (parsed as integers): project_id=#{project_id}, task_id=#{task_id}, new_position=#{new_position}, adjusted_position=#{adjusted_position}, status=#{status}"
+        
+        if Task.reorder_board(project_id, task_id, adjusted_position, status)
+          # Return the updated task list for the specified status
+          @tasks = Task.where(project_id: project_id)
+                       .order(:status, :board_order)
+          
+          render json: @tasks
+        else
+          Rails.logger.error "Failed to reorder board tasks"
+          render json: { error: "Failed to reorder tasks" }, status: :unprocessable_entity
         end
       end
       
@@ -117,7 +216,7 @@ module Api
         params.require(:task).permit(
           :name, :description, :start_date, :due_date, 
           :status, :percent_complete, :project_id, :parent_id, :assignee_id,
-          :progress
+          :progress, :gantt_order, :board_order
         )
       end
       

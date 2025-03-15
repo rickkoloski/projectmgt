@@ -186,9 +186,11 @@
             :dependencies="dependencies"
             :selected-dependency-index="selectedDependencyIndex"
             @update:task="updateTask"
+            @update:tasks="updateTasksList"
             @update:dependency="updateDependency"
             @select:dependency="selectDependency"
             @delete:task="confirmDeleteTask"
+            @tasks-reordered="handleTasksReordered"
           />
           
           <!-- Board View -->
@@ -198,6 +200,7 @@
             :resources="resources"
             @update:task="updateTask"
             @delete="confirmDeleteTask"
+            @tasks-reordered="handleTasksReordered"
           />
           
           <!-- Resources View -->
@@ -1074,6 +1077,63 @@ export default {
     
     selectDependency(index) {
       this.selectedDependencyIndex = (this.selectedDependencyIndex === index) ? -1 : index;
+    },
+    
+    // Update entire tasks list (for reordering operations)
+    updateTasksList(updatedTasks) {
+      console.log('Updating entire tasks list:', updatedTasks);
+      if (Array.isArray(updatedTasks)) {
+        // Replace the root tasks array while preserving children structure
+        this.tasks = [...updatedTasks];
+      }
+    },
+    
+    // Handle task reordering from server response
+    handleTasksReordered(updatedTasks) {
+      console.log('Tasks reordered from server, updating task list:', updatedTasks);
+      
+      if (Array.isArray(updatedTasks) && updatedTasks.length > 0) {
+        console.log('Before task reordering, current task list:', this.tasks.map(t => ({
+          id: t.id, 
+          name: t.name, 
+          order: t.gantt_order
+        })));
+        
+        // COMPLETELY REPLACE task array with the new order from server
+        // First clear the array
+        while (this.tasks.length > 0) {
+          this.tasks.pop();
+        }
+        
+        // Then add the updated tasks
+        updatedTasks.forEach(task => {
+          this.tasks.push(task);
+        });
+        
+        // Sort the top-level tasks by gantt_order if in gantt view
+        if (this.currentView === 'gantt') {
+          this.tasks.sort((a, b) => (a.gantt_order || 0) - (b.gantt_order || 0));
+        }
+        
+        console.log('After task reordering, new task list:', this.tasks.map(t => ({
+          id: t.id, 
+          name: t.name, 
+          order: t.gantt_order
+        })));
+        
+        // Force a UI refresh
+        this.$forceUpdate();
+        
+        // Schedule a delayed refresh to ensure UI is updated
+        setTimeout(() => {
+          console.log('Delayed refresh, task list is now:', this.tasks.map(t => ({
+            id: t.id, 
+            name: t.name, 
+            order: t.gantt_order
+          })));
+          this.$forceUpdate();
+        }, 100);
+      }
     },
     
     deleteDependency() {

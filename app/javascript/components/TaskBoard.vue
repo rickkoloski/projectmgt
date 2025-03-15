@@ -5,36 +5,40 @@
         v-for="column in columns" 
         :key="column.id" 
         class="board-column"
-        @dragover.prevent="onDragOver"
-        @drop="onDrop($event, column.status)"
       >
         <div class="column-header">
           <h3>{{ column.name }}</h3>
           <span class="task-count">{{ tasksInColumn(column).length }}</span>
           <button class="add-task-btn" @click="addNewTask(column.status)">+</button>
         </div>
-        <div 
-          class="column-content"
-          :class="{ 'drag-over': dragOverColumn === column.status }"
-          @dragenter.prevent="dragOverColumn = column.status"
-          @dragleave="onDragLeave($event, column.status)"
-        >
-          <task-card 
-            v-for="task in tasksInColumn(column)" 
-            :key="task.id" 
-            :task="task"
-            :resources="resources"
-            @update:task="updateTask"
-            @dragstart="onDragStart($event, task)"
-            @delete="deleteTask"
-            draggable="true"
-          />
+        <div class="column-content">
+          <!-- Draggable container for task cards -->
+          <draggable
+            :list="getColumnTasks(column)"
+            :group="{ name: 'tasks', pull: true, put: true }"
+            item-key="id"
+            handle=".drag-handle"
+            ghost-class="ghost-card"
+            chosen-class="drag-chosen"
+            :animation="200"
+            @change="onChange($event, column.status)"
+          >
+            <template #item="{ element }">
+              <task-card 
+                :task="element"
+                :resources="resources"
+                @update:task="updateTask"
+                @delete="deleteTask"
+                :data-task-id="element.id"
+                :data-board-order="element.board_order"
+              />
+            </template>
+          </draggable>
           
           <!-- Drop placeholder that appears when column is empty -->
           <div 
             v-if="tasksInColumn(column).length === 0" 
             class="empty-column-placeholder"
-            :class="{ 'drag-over': dragOverColumn === column.status }"
           >
             Drop tasks here
           </div>
@@ -46,10 +50,12 @@
 
 <script>
 import TaskCard from './TaskCard.vue';
+import { VueDraggableNext } from 'vue-draggable-next';
 
 export default {
   components: {
-    TaskCard
+    TaskCard,
+    draggable: VueDraggableNext
   },
   props: {
     tasks: {
@@ -63,6 +69,7 @@ export default {
   },
   created() {
     console.log('TaskBoard initialized with resources:', this.resources);
+    this.initializeColumnTasks();
   },
   data() {
     return {
@@ -73,12 +80,52 @@ export default {
         { id: 'review', name: 'Review', status: 'review' },
         { id: 'done', name: 'Done', status: 'done' }
       ],
-      draggedTask: null,
-      dragOverColumn: null,
-      dragLeaveTimeout: null
+      columnTasks: {
+        backlog: [],
+        todo: [],
+        inProgress: [],
+        review: [],
+        done: []
+      },
+      currentProjectId: null
     };
   },
+  watch: {
+    tasks: {
+      handler() {
+        this.initializeColumnTasks();
+      },
+      deep: true
+    }
+  },
   methods: {
+    // Initialize column tasks from props
+    initializeColumnTasks() {
+      const leafTasks = this.getAllLeafTasks(this.tasks);
+      
+      // Get project ID from the first task
+      if (leafTasks.length > 0) {
+        this.currentProjectId = leafTasks[0].project_id;
+      }
+      
+      // Group tasks by status
+      this.columns.forEach(column => {
+        const tasksInColumn = leafTasks.filter(task => task.status === column.status);
+        
+        // Sort by board_order
+        tasksInColumn.sort((a, b) => {
+          return (a.board_order || 0) - (b.board_order || 0);
+        });
+        
+        this.columnTasks[column.status] = tasksInColumn;
+      });
+    },
+    
+    // Get tasks for a specific column from local state
+    getColumnTasks(column) {
+      return this.columnTasks[column.status] || [];
+    },
+    
     // Only display non-summary tasks (tasks without children)
     isLeafTask(task) {
       return !task.children || task.children.length === 0;
@@ -102,16 +149,7 @@ export default {
     
     // Get tasks for a specific column
     tasksInColumn(column) {
-      const leafTasks = this.getAllLeafTasks(this.tasks);
-      
-      // Debug info
-      if (column.status === 'todo') {
-        console.log(`Looking for tasks with status '${column.status}'. Available statuses:`, 
-          [...new Set(leafTasks.map(t => t.status))]);
-        console.log(`Found ${leafTasks.filter(task => task.status === column.status).length} tasks for ${column.status}`);
-      }
-      
-      return leafTasks.filter(task => task.status === column.status);
+      return this.columnTasks[column.status] || [];
     },
     
     // Update task data
@@ -138,68 +176,105 @@ export default {
         endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 1 week from now
         progress: 0,
         status: status,
-        resources: []
+        resources: [],
+        project_id: this.currentProjectId
       };
       
       // Emit the event to create the task
       this.$emit('update:task', newTask);
     },
     
-    // Drag and drop handlers
-    onDragStart(event, task) {
-      this.draggedTask = task;
-      // Set data for drag operation
-      event.dataTransfer.effectAllowed = 'move';
-      event.dataTransfer.setData('text/plain', task.id);
-      
-      // Add a class to the dragged element for styling
-      event.target.classList.add('dragging');
-    },
-    
-    onDragOver(event) {
-      event.preventDefault();
-      // Change the cursor to indicate a drop is allowed
-      event.dataTransfer.dropEffect = 'move';
-    },
-    
-    onDragLeave(event, columnStatus) {
-      // Check if we're leaving the column and not just moving between its children
-      // We need to check if the relatedTarget (what we're entering) is not inside the column
-      const column = event.currentTarget;
-      
-      // Clear any existing timeout to prevent flickering
-      if (this.dragLeaveTimeout) {
-        clearTimeout(this.dragLeaveTimeout);
+    // Handle changes from draggable component
+    onChange(event, columnStatus) {
+      // Handle added item
+      if (event.added) {
+        const { newIndex, element } = event.added;
+        this.handleTaskMoved(element, columnStatus, newIndex);
       }
-      
-      // Set a short timeout to avoid flickering when moving between tasks
-      this.dragLeaveTimeout = setTimeout(() => {
-        if (!column.contains(event.relatedTarget)) {
-          if (this.dragOverColumn === columnStatus) {
-            this.dragOverColumn = null;
-          }
-        }
-      }, 50);
+      // Handle moved item
+      else if (event.moved) {
+        const { newIndex, element } = event.moved;
+        this.handleTaskReordered(element, columnStatus, newIndex);
+      }
+      // Handle removed item (moved to another column)
+      else if (event.removed) {
+        // This is handled by the 'added' event in the destination column
+      }
     },
     
-    onDrop(event, columnStatus) {
-      event.preventDefault();
-      // Reset the dragover state
-      this.dragOverColumn = null;
+    // Handle when a task is moved between columns
+    handleTaskMoved(task, newStatus, newPosition) {
+      if (task.status !== newStatus) {
+        // Task was moved to a new column
+        const updatedTask = { 
+          ...task, 
+          status: newStatus
+        };
+        
+        // Update task first to change its status
+        this.updateTask(updatedTask);
+        
+        // Then reorder it within the new column
+        this.reorderTask(task.id, newPosition, newStatus);
+      } else {
+        // Just a reorder within the same column
+        this.reorderTask(task.id, newPosition, newStatus);
+      }
+    },
+    
+    // Handle when a task is reordered within the same column
+    handleTaskReordered(task, status, newPosition) {
+      this.reorderTask(task.id, newPosition, status);
+    },
+    
+    // Call the API to reorder tasks
+    reorderTask(taskId, newPosition, status) {
+      if (!this.currentProjectId) return;
       
-      // If no task is being dragged, exit
-      if (!this.draggedTask) return;
+      const url = '/api/v1/tasks/reorder_board';
+      const data = {
+        project_id: this.currentProjectId,
+        task_id: taskId,
+        position: newPosition,
+        status: status
+      };
       
-      // Update the task's status
-      const updatedTask = { ...this.draggedTask, status: columnStatus };
-      this.updateTask(updatedTask);
+      console.log(`Reordering board task ${taskId} to position ${newPosition}`);
       
-      // Reset the dragged task
-      this.draggedTask = null;
+      // Get CSRF token from meta tag
+      const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
       
-      // Remove the dragging class from all elements
-      document.querySelectorAll('.dragging').forEach(el => {
-        el.classList.remove('dragging');
+      // Optimistic update is already handled by vue-draggable-next's automatic list update
+      // Note: We're keeping the server update for data persistence
+      
+      // Make the API call
+      fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': csrfToken,
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify(data),
+        credentials: 'same-origin'
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Failed to reorder task');
+        }
+        return response.json();
+      })
+      .then(updatedTasks => {
+        console.log('Tasks reordered successfully:', updatedTasks);
+        // Emit an event to update parent component's tasks
+        this.$emit('tasks-reordered', updatedTasks);
+        // Also update our columnTasks with the latest data from server
+        this.initializeColumnTasks();
+      })
+      .catch(error => {
+        console.error('Error reordering tasks:', error);
+        // If the server update fails, we should reset the UI to match server state
+        this.initializeColumnTasks();
       });
     }
   }
@@ -292,7 +367,6 @@ export default {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 12px;
   /* Add a subtle scrollbar */
   scrollbar-width: thin;
   scrollbar-color: #ccc transparent;
@@ -314,10 +388,25 @@ export default {
   border-radius: 6px;
 }
 
-/* Drag and drop styles */
-.column-content.drag-over {
+/* Sortable/draggable styles */
+.sortable-ghost {
+  opacity: 0.3;
+  border: 2px dashed #4a8bf4;
   background-color: rgba(144, 202, 249, 0.15);
-  box-shadow: inset 0 0 0 2px #4a8bf4;
+}
+
+.ghost-card {
+  opacity: 0.4;
+  background-color: #f0f5ff !important;
+  border: 2px dashed #4a8bf4 !important;
+  transform: scale(0.98);
+}
+
+.drag-chosen {
+  /* Style for the chosen item being dragged */
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  transform: scale(1.01);
+  z-index: 100;
 }
 
 .empty-column-placeholder {
@@ -332,16 +421,13 @@ export default {
   transition: all 0.2s;
 }
 
-.empty-column-placeholder.drag-over {
-  border-color: #4a8bf4;
-  background-color: rgba(144, 202, 249, 0.15);
-  color: #4a8bf4;
+/* Gap between cards in a column */
+.column-content > [data-draggable="true"] {
+  padding: 5px 0;
 }
 
-/* Style for cards being dragged */
-.task-card.dragging {
-  opacity: 0.6;
-  transform: scale(0.95);
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+/* Add gap between sortable items */
+.column-content [data-draggable="true"] + [data-draggable="true"] {
+  margin-top: 10px;
 }
 </style>

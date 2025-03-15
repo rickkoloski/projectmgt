@@ -8,6 +8,8 @@ class Task < ApplicationRecord
   def as_json(options = {})
     super(options).tap do |hash|
       hash['progress'] = percent_complete if percent_complete.present?
+      hash['gantt_order'] = gantt_order if gantt_order.present?
+      hash['board_order'] = board_order if board_order.present?
     end
   end
   
@@ -39,6 +41,121 @@ class Task < ApplicationRecord
   
   before_validation :set_default_status, if: -> { status.blank? }
   before_validation :set_default_priority, if: -> { priority.blank? }
+  before_validation :set_default_order, on: :create
+  before_save :reorder_tasks_if_order_changed
+  
+  # Scopes for ordered tasks
+  scope :gantt_ordered, -> { order(:gantt_order) }
+  scope :board_ordered, -> { order(:board_order) }
+  scope :ordered_by_status, -> { order(:status, :board_order) }
+  
+  # Class methods for reordering
+  class << self
+    # Reorder tasks in gantt view
+    def reorder_gantt(project_id, task_id, new_position)
+      Rails.logger.info "Task.reorder_gantt called with: project_id=#{project_id}, task_id=#{task_id}, new_position=#{new_position}"
+      
+      return false unless task_id.present? && new_position.present?
+      
+      task = find_by(id: task_id, project_id: project_id)
+      
+      if !task
+        Rails.logger.error "Task not found: id=#{task_id}, project_id=#{project_id}"
+        return false
+      end
+      
+      Rails.logger.info "Found task: #{task.name} (#{task.id}), current gantt_order=#{task.gantt_order}"
+      
+      # Get all tasks in the same project
+      tasks = where(project_id: project_id).order(:gantt_order)
+      Rails.logger.info "Total tasks in project: #{tasks.count}"
+      
+      # Remove task from its current position
+      tasks = tasks.to_a
+      current_position = tasks.index(task)
+      Rails.logger.info "Current task position in array: #{current_position}"
+      
+      tasks.delete(task)
+      
+      # Ensure new_position is within bounds
+      new_position = [new_position, tasks.length].min
+      new_position = [0, new_position].max
+      
+      Rails.logger.info "Inserting task at position: #{new_position} (adjusted to be in bounds)"
+      
+      # Insert task at new position
+      tasks.insert(new_position, task)
+      
+      # Update order for all tasks
+      transaction do
+        tasks.each_with_index do |t, index|
+          Rails.logger.info "Setting task #{t.id} (#{t.name}) gantt_order to #{index + 1}"
+          t.update_columns(gantt_order: index + 1)
+        end
+      end
+      
+      Rails.logger.info "Task reordering complete, task #{task_id} now at position #{new_position} with order #{task.reload.gantt_order}"
+      true
+    end
+    
+    # Reorder tasks in board view (within a status column)
+    def reorder_board(project_id, task_id, new_position, status)
+      return false unless task_id.present? && new_position.present?
+      
+      task = find_by(id: task_id, project_id: project_id)
+      return false unless task
+      
+      old_status = task.status
+      new_status = status || old_status
+      
+      # If status is changing, handle differently
+      if old_status != new_status
+        # Shift all tasks in the OLD status down
+        where(project_id: project_id, status: old_status)
+          .where('board_order > ?', task.board_order)
+          .update_all('board_order = board_order - 1')
+        
+        # Set task to new status
+        task.status = new_status
+        
+        # Get max order in the new status
+        max_order = where(project_id: project_id, status: new_status).maximum(:board_order) || 0
+        
+        # If the new position is beyond the end, place at the end
+        if new_position.to_i > max_order
+          task.board_order = max_order + 1
+        else
+          # Shift all tasks in the new status up to make space
+          where(project_id: project_id, status: new_status)
+            .where('board_order >= ?', new_position.to_i)
+            .update_all('board_order = board_order + 1')
+          
+          task.board_order = new_position.to_i
+        end
+        
+        task.save!
+      else
+        # Get all tasks in the same project and status
+        tasks = where(project_id: project_id, status: status).order(:board_order)
+        
+        # Remove task from its current position
+        tasks = tasks.to_a
+        tasks.delete(task)
+        
+        # Insert task at new position
+        tasks.insert(new_position.to_i, task)
+        
+        # Update order for all tasks
+        transaction do
+          tasks.each_with_index do |t, index|
+            t.update_columns(board_order: index + 1)
+          end
+        end
+      end
+      
+      true
+    end
+  end
   
   # Check if this task depends on another task
   def depends_on?(other_task)
@@ -95,5 +212,64 @@ class Task < ApplicationRecord
   
   def set_default_priority
     self.priority = 'medium'
+  end
+  
+  def set_default_order
+    # For Gantt order, get max order + 1 for the project
+    self.gantt_order ||= Task.where(project_id: project_id).maximum(:gantt_order).to_i + 1
+    
+    # For Board order, get max order + 1 for the project and status combination
+    self.board_order ||= Task.where(project_id: project_id, status: status).maximum(:board_order).to_i + 1
+  end
+  
+  def reorder_tasks_if_order_changed
+    # Handle manual changes to order attributes
+    return unless persisted?
+    
+    if gantt_order_changed?
+      # If moving down (higher order value)
+      if gantt_order_was && gantt_order > gantt_order_was
+        Task.where(project_id: project_id)
+            .where('gantt_order > ? AND gantt_order <= ?', gantt_order_was, gantt_order)
+            .where.not(id: id)
+            .update_all('gantt_order = gantt_order - 1')
+      # If moving up (lower order value)
+      elsif gantt_order_was && gantt_order < gantt_order_was
+        Task.where(project_id: project_id)
+            .where('gantt_order >= ? AND gantt_order < ?', gantt_order, gantt_order_was)
+            .where.not(id: id)
+            .update_all('gantt_order = gantt_order + 1')
+      end
+    end
+    
+    if board_order_changed? || status_changed?
+      if status_changed?
+        # Handle status changes - update old status column
+        Task.where(project_id: project_id, status: status_was)
+            .where('board_order > ?', board_order_was)
+            .update_all('board_order = board_order - 1')
+        
+        # Make space in new status column
+        Task.where(project_id: project_id, status: status)
+            .where('board_order >= ?', board_order)
+            .where.not(id: id)
+            .update_all('board_order = board_order + 1')
+      else
+        # Handle board order changes within same status
+        # If moving down
+        if board_order_was && board_order > board_order_was
+          Task.where(project_id: project_id, status: status)
+              .where('board_order > ? AND board_order <= ?', board_order_was, board_order)
+              .where.not(id: id)
+              .update_all('board_order = board_order - 1')
+        # If moving up
+        elsif board_order_was && board_order < board_order_was
+          Task.where(project_id: project_id, status: status)
+              .where('board_order >= ? AND board_order < ?', board_order, board_order_was)
+              .where.not(id: id)
+              .update_all('board_order = board_order + 1')
+        end
+      end
+    end
   end
 end
