@@ -11,6 +11,7 @@
         <div class="column-header">
           <h3>{{ column.name }}</h3>
           <span class="task-count">{{ tasksInColumn(column).length }}</span>
+          <button class="add-task-btn" @click="addNewTask(column.status)">+</button>
         </div>
         <div 
           class="column-content"
@@ -102,6 +103,14 @@ export default {
     // Get tasks for a specific column
     tasksInColumn(column) {
       const leafTasks = this.getAllLeafTasks(this.tasks);
+      
+      // Debug info
+      if (column.status === 'todo') {
+        console.log(`Looking for tasks with status '${column.status}'. Available statuses:`, 
+          [...new Set(leafTasks.map(t => t.status))]);
+        console.log(`Found ${leafTasks.filter(task => task.status === column.status).length} tasks for ${column.status}`);
+      }
+      
       return leafTasks.filter(task => task.status === column.status);
     },
     
@@ -113,6 +122,27 @@ export default {
     // Delete a task
     deleteTask(taskId) {
       this.$emit('delete', taskId);
+    },
+    
+    // Add a new task in the specified column
+    addNewTask(status) {
+      console.log(`Adding new task in column: ${status}`);
+      
+      // Create a new task with default values
+      const newTask = {
+        // Temporary negative ID to identify it as new (will be replaced by server)
+        id: -Math.floor(Math.random() * 1000000),
+        name: `New Task in ${this.columns.find(c => c.status === status).name}`,
+        description: '',
+        startDate: new Date(),
+        endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 1 week from now
+        progress: 0,
+        status: status,
+        resources: []
+      };
+      
+      // Emit the event to create the task
+      this.$emit('update:task', newTask);
     },
     
     // Drag and drop handlers
@@ -217,6 +247,27 @@ export default {
   position: sticky;
   top: 0;
   z-index: 10;
+}
+
+.add-task-btn {
+  width: 24px;
+  height: 24px;
+  background-color: rgba(0, 0, 0, 0.1);
+  border: none;
+  border-radius: 50%;
+  color: #333;
+  font-size: 16px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  margin-left: 8px;
+  transition: all 0.2s ease;
+}
+
+.add-task-btn:hover {
+  background-color: rgba(0, 0, 0, 0.2);
 }
 
 .column-header h3 {

@@ -256,7 +256,13 @@ export default {
         'todo': 'To Do',
         'inProgress': 'In Progress',
         'review': 'Review',
-        'done': 'Done'
+        'done': 'Done',
+        // Legacy mappings for backward compatibility
+        'not_started': 'To Do',
+        'in_progress': 'In Progress',
+        'on_hold': 'Backlog',
+        'completed': 'Done',
+        'cancelled': 'Backlog'
       };
     }
   },

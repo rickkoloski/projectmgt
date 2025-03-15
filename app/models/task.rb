@@ -1,6 +1,16 @@
 class Task < ApplicationRecord
   include RowLevelSecurity
   
+  # Add progress attribute accessor that maps to percent_complete
+  alias_attribute :progress, :percent_complete
+  
+  # Ensure progress is included in JSON serialization
+  def as_json(options = {})
+    super(options).tap do |hash|
+      hash['progress'] = percent_complete if percent_complete.present?
+    end
+  end
+  
   belongs_to :project
   belongs_to :creator, class_name: 'User', optional: true
   belongs_to :assignee, class_name: 'User', optional: true
@@ -20,7 +30,7 @@ class Task < ApplicationRecord
   validates :project, presence: true
   
   # Status options
-  STATUSES = %w[not_started in_progress on_hold completed cancelled].freeze
+  STATUSES = %w[backlog todo inProgress review done].freeze
   validates :status, inclusion: { in: STATUSES }, allow_nil: true
   
   # Priority options
@@ -80,7 +90,7 @@ class Task < ApplicationRecord
   private
   
   def set_default_status
-    self.status = 'not_started'
+    self.status = 'todo'
   end
   
   def set_default_priority

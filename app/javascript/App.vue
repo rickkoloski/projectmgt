@@ -275,6 +275,34 @@
             </button>
           </div>
         </div>
+        
+        <!-- Gantt Zoom and Timeline Controls -->
+        <div class="debug-section" v-if="currentView === 'gantt'">
+          <h4>Gantt Zoom & Timeline</h4>
+          <div class="debug-info">
+            <!-- Zoom Level Information -->
+            <p><strong>Current Zoom Level:</strong> <span class="zoom-level-value">{{ $refs.ganttChart ? $refs.ganttChart.zoomLevel.toFixed(2) : 'N/A' }}</span></p>
+            <p><strong>Timeline Mode:</strong> <span class="timeline-mode-value">{{ $refs.ganttChart ? $refs.ganttChart.timelineMode : 'N/A' }}</span></p>
+            
+            <!-- Quick Zoom Buttons -->
+            <div class="debug-actions">
+              <button 
+                type="button" 
+                class="btn-debug-action"
+                @click="$refs.ganttChart?.zoomIn()"
+              >
+                Zoom In
+              </button>
+              <button 
+                type="button" 
+                class="btn-debug-action"
+                @click="$refs.ganttChart?.zoomOut()"
+              >
+                Zoom Out
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
     
@@ -435,6 +463,23 @@
       </div>
     </div>
     
+    <!-- Task Creation Confirmation Modal -->
+    <div v-if="showTaskCreationConfirmModal" class="modal-backdrop">
+      <div class="modal-container">
+        <div class="modal-header">
+          <h3>Create Tasks</h3>
+        </div>
+        <div class="modal-body">
+          <p>I'm about to create tasks in this project. How would you like to proceed?</p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-primary" @click="confirmTaskCreation('append')">Add to existing tasks</button>
+          <button class="btn-danger" @click="confirmTaskCreation('replace')">Replace all tasks</button>
+          <button class="btn-cancel" @click="cancelTaskCreation">Cancel</button>
+        </div>
+      </div>
+    </div>
+    
   </div>
 </template>
 
@@ -504,6 +549,11 @@ export default {
       showDeleteConfirmModal: false,
       taskToDelete: null,
       selectedDependencyIndex: -1,
+      
+      // Task Creation Confirmation
+      showTaskCreationConfirmModal: false,
+      pendingTaskCreationMessage: '',
+      taskCreationMode: 'append', // 'append' or 'replace'
       
       // Application Data
       tasks: [], // Start with empty array, will be filled by API call
@@ -667,9 +717,11 @@ export default {
     
     // Task Management
     addTask() {
-      const newId = Math.max(...this.tasks.map(t => t.id)) + 1;
+      // Generate a temporary client-side ID (negative to avoid conflicts with server IDs)
+      const tempId = -Math.floor(Math.random() * 10000) - 1;
+      
       const newTask = {
-        id: newId,
+        id: tempId, // Temporary ID until saved
         name: 'New Task',
         startDate: new Date(),
         endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
@@ -678,30 +730,59 @@ export default {
         resources: [],
         children: []
       };
+      
+      // Add to local state first for immediate UI feedback
       this.tasks.push(newTask);
+      
+      // Save to server
+      this.saveTask(newTask);
     },
     
     updateTask(updatedTask) {
       console.log("App - Update task:", updatedTask.id, "Expanded:", updatedTask.expanded);
+      
+      // Skip server updates for temporary UI state changes like expansion toggle
+      const isOnlyExpanding = 
+        Object.keys(updatedTask).length === 2 && // Only id and expanded
+        'expanded' in updatedTask;
+        
+      // Debug: Log status information if present
+      if ('status' in updatedTask) {
+        console.log(`Task ${updatedTask.id} status update:`, {
+          newStatus: updatedTask.status
+        });
+      }
+      
       const updateTaskInList = (tasks) => {
         for (let i = 0; i < tasks.length; i++) {
           if (tasks[i].id === updatedTask.id) {
             // Check if only the expanded state is changing
-            const isOnlyExpanding = 
-              Object.keys(updatedTask).length === 2 && // Only id and expanded
-              'expanded' in updatedTask && 
+            const isOnlyExpandingThis = 
+              isOnlyExpanding && 
               tasks[i].expanded !== updatedTask.expanded;
               
             // Update the task with the changes
+            const oldTask = {...tasks[i]};
+            
+            // Debug: Log status change if happening
+            if ('status' in updatedTask && oldTask.status !== updatedTask.status) {
+              console.log(`Task ${updatedTask.id} status changing from "${oldTask.status}" to "${updatedTask.status}"`);
+            }
+            
             tasks[i] = { ...tasks[i], ...updatedTask };
             
-            // For expansion-only changes, we don't need to recalculate dates
-            if (isOnlyExpanding) {
+            // For expansion-only changes, we don't need to recalculate dates or save to server
+            if (isOnlyExpandingThis) {
               console.log("Task expansion toggled:", tasks[i].expanded);
               return { updated: true, hasChanged: false, expandOnly: true };
             }
             
             // For other changes, signal that dates may need to be recalculated
+            // and save to server if it's not a temporary task still being created
+            if (!isOnlyExpanding && tasks[i].id > 0) {
+              this.saveTask(tasks[i]);
+            }
+            
             return { updated: true, hasChanged: true, expandOnly: false };
           }
           
@@ -711,6 +792,11 @@ export default {
               // If a child was updated and it's not just an expansion change
               if (result.hasChanged && !result.expandOnly) {
                 this.recalculateSummaryTaskDates(tasks[i]);
+                
+                // Save the parent task if its dates changed
+                if (tasks[i].id > 0) {
+                  this.saveTask(tasks[i]);
+                }
               }
               return { 
                 updated: true, 
@@ -724,6 +810,114 @@ export default {
       };
       
       updateTaskInList(this.tasks);
+    },
+    
+    // Save task to server
+    saveTask(task) {
+      // Skip saving if this is a UI-only change (like expanding/collapsing)
+      if (task.id < 0) {
+        // This is a new task with a temporary ID
+        console.log('Saving new task to server:', task);
+        
+        // Create the server payload
+        const payload = {
+          task: {
+            name: task.name,
+            description: task.description || '',
+            start_date: task.startDate.toISOString(),
+            due_date: task.endDate.toISOString(),
+            status: task.status || 'todo',
+            percent_complete: task.progress || 0,
+            project_id: this.projectId,
+            parent_id: task.parent_id || null,
+            assignee_id: (task.resources && task.resources.length > 0) ? task.resources[0] : null
+          }
+        };
+        
+        // Make API call to create task
+        fetch('/api/v1/tasks', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
+          },
+          body: JSON.stringify(payload)
+        })
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`Server responded with ${response.status}: ${response.statusText}`);
+          }
+          return response.json();
+        })
+        .then(savedTask => {
+          console.log('Task saved successfully:', savedTask);
+          
+          // Update the task in our local state with the server-assigned ID
+          const updateTempTaskId = (tasks) => {
+            for (let i = 0; i < tasks.length; i++) {
+              if (tasks[i].id === task.id) {
+                // Update the temporary ID with the real one from the server
+                tasks[i].id = savedTask.id;
+                return true;
+              }
+              if (tasks[i].children && tasks[i].children.length > 0) {
+                if (updateTempTaskId(tasks[i].children)) {
+                  return true;
+                }
+              }
+            }
+            return false;
+          };
+          
+          updateTempTaskId(this.tasks);
+        })
+        .catch(error => {
+          console.error('Error saving task:', error);
+          alert('Failed to save task. Please try again.');
+        });
+      } else {
+        // This is an update to an existing task
+        console.log('Updating existing task on server:', task);
+        
+        // Create the server payload
+        const payload = {
+          task: {
+            name: task.name,
+            description: task.description || '',
+            start_date: task.startDate.toISOString(),
+            due_date: task.endDate.toISOString(),
+            status: task.status || 'todo',
+            percent_complete: task.progress || 0,
+            project_id: this.projectId,
+            parent_id: task.parent_id || null,
+            assignee_id: (task.resources && task.resources.length > 0) ? task.resources[0] : null
+          }
+        };
+        
+        // Make API call to update task
+        fetch(`/api/v1/tasks/${task.id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
+          },
+          body: JSON.stringify(payload)
+        })
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`Server responded with ${response.status}: ${response.statusText}`);
+          }
+          return response.json();
+        })
+        .then(updatedTask => {
+          console.log('Task updated successfully:', updatedTask);
+        })
+        .catch(error => {
+          console.error('Error updating task:', error);
+          // We might want to revert the local change if the server update fails
+          // For now, just log the error
+        });
+      }
     },
     
     // Method to recalculate summary task dates
@@ -771,6 +965,43 @@ export default {
     deleteTask() {
       if (!this.taskToDelete) return;
       
+      // For tasks with temporary IDs (negative), we can just remove them from the UI
+      if (this.taskToDelete.id < 0) {
+        this.deleteTaskLocal();
+        return;
+      }
+      
+      // For tasks with server IDs, delete from server first
+      console.log('Deleting task from server:', this.taskToDelete.id);
+      
+      fetch(`/api/v1/tasks/${this.taskToDelete.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
+        }
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Server responded with ${response.status}: ${response.statusText}`);
+        }
+        
+        // If the server delete was successful, update the UI
+        this.deleteTaskLocal();
+        return response.json();
+      })
+      .catch(error => {
+        console.error('Error deleting task:', error);
+        alert('Failed to delete task. Please try again.');
+        
+        // Close the modal even if there was an error
+        this.showDeleteConfirmModal = false;
+        this.taskToDelete = null;
+      });
+    },
+    
+    // Local deletion (UI only)
+    deleteTaskLocal() {
       const deleteTaskFromList = (tasks, taskId) => {
         for (let i = 0; i < tasks.length; i++) {
           if (tasks[i].id === taskId) {
@@ -799,7 +1030,27 @@ export default {
     
     // Dependency Management
     updateDependency(updatedDependencies) {
+      console.log('updateDependency called with:', updatedDependencies);
+      
       if (Array.isArray(updatedDependencies)) {
+        console.log('Processing array of dependencies:', updatedDependencies.length);
+        
+        // Find and save new dependencies
+        updatedDependencies.forEach(dep => {
+          // If this dependency doesn't exist in the current list, it's new
+          const existingIndex = this.dependencies.findIndex(
+            existing => existing.from === dep.from && existing.to === dep.to
+          );
+          
+          console.log('Checking dependency:', dep, 'Exists:', existingIndex !== -1);
+          
+          if (existingIndex === -1) {
+            // This is a new dependency
+            console.log('New dependency found, saving:', dep);
+            this.saveDependency(dep);
+          }
+        });
+        
         // Create a clean copy to ensure reactivity
         this.dependencies = JSON.parse(JSON.stringify(updatedDependencies));
         console.log("Dependencies updated:", this.dependencies);
@@ -809,6 +1060,12 @@ export default {
         if (index >= 0 && index < this.dependencies.length) {
           // Make a clean copy of the dependencies array
           const newDeps = [...this.dependencies];
+          
+          // Save the change if IDs are valid (not temporary)
+          if (dependency.from > 0 && dependency.to > 0) {
+            this.saveDependency(dependency);
+          }
+          
           newDeps[index] = { ...dependency };
           this.dependencies = newDeps;
         }
@@ -821,9 +1078,111 @@ export default {
     
     deleteDependency() {
       if (this.selectedDependencyIndex >= 0 && this.selectedDependencyIndex < this.dependencies.length) {
+        const depToDelete = this.dependencies[this.selectedDependencyIndex];
+        
+        // Only delete from server if it's a real dependency (not temporary)
+        if (depToDelete.from > 0 && depToDelete.to > 0) {
+          this.deleteDependencyFromServer(depToDelete);
+        }
+        
+        // Remove from local state
         this.dependencies.splice(this.selectedDependencyIndex, 1);
         this.selectedDependencyIndex = -1;
       }
+    },
+    
+    // Save dependency to server
+    saveDependency(dependency) {
+      console.log('saveDependency called with:', dependency);
+      
+      // Skip if either task has a temporary ID
+      if (dependency.from < 0 || dependency.to < 0) {
+        console.log('Skipping dependency save for temporary tasks:', dependency);
+        return;
+      }
+      
+      // Check if fromType and toType are present
+      if (!dependency.fromType || !dependency.toType) {
+        console.error('Missing fromType or toType in dependency:', dependency);
+        console.log('Setting default types (end-to-start)');
+        dependency.fromType = dependency.fromType || 'end';
+        dependency.toType = dependency.toType || 'start';
+      }
+      
+      console.log('Saving dependency to server:', dependency);
+      
+      // Convert from the UI format to the API format
+      const dependencyType = this.getDependencyTypeForAPI(dependency.fromType, dependency.toType);
+      console.log('Converted dependency type:', dependencyType);
+      
+      const payload = {
+        task_dependency: {
+          task_id: dependency.from,
+          dependent_task_id: dependency.to,
+          dependency_type: dependencyType,
+          project_id: this.projectId
+        }
+      };
+      
+      console.log('API payload:', payload);
+      
+      // Make API call to create dependency
+      fetch('/api/v1/task_dependencies', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
+        },
+        body: JSON.stringify(payload)
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Server responded with ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+      })
+      .then(savedDependency => {
+        console.log('Dependency saved successfully:', savedDependency);
+      })
+      .catch(error => {
+        console.error('Error saving dependency:', error);
+      });
+    },
+    
+    // Delete dependency from server
+    deleteDependencyFromServer(dependency) {
+      console.log('Deleting dependency from server:', dependency);
+      
+      // We don't have a direct API for deleting by from/to IDs
+      // We would normally delete by ID, but for now we can use a query parameter approach
+      fetch(`/api/v1/task_dependencies/delete_by_tasks?task_id=${dependency.from}&dependent_task_id=${dependency.to}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
+        }
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Server responded with ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+      })
+      .then(result => {
+        console.log('Dependency deleted successfully:', result);
+      })
+      .catch(error => {
+        console.error('Error deleting dependency:', error);
+      });
+    },
+    
+    // Convert fromType/toType to API dependency_type
+    getDependencyTypeForAPI(fromType, toType) {
+      if (fromType === 'end' && toType === 'start') return 'finish_to_start';
+      if (fromType === 'start' && toType === 'start') return 'start_to_start';
+      if (fromType === 'end' && toType === 'end') return 'finish_to_finish';
+      if (fromType === 'start' && toType === 'end') return 'start_to_finish';
+      return 'finish_to_start'; // Default
     },
     
     // Zoom Controls
@@ -863,6 +1222,23 @@ export default {
         }
       });
       
+      // If this is a task creation request in a project with existing tasks, show confirmation
+      if (this.isTaskCreationRequest(userMessage) && this.projectId && this.projectHasTasks()) {
+        console.log('Task creation request detected in a project with existing tasks');
+        
+        // Store the message for later processing
+        this.pendingTaskCreationMessage = userMessage;
+        
+        // Show the confirmation dialog
+        this.showTaskCreationConfirmModal = true;
+        
+        // Remove the message we just added to avoid duplication when confirmTaskCreation runs
+        this.aiChatMessages.pop();
+        
+        // Exit early - we'll continue after user confirms
+        return;
+      }
+      
       // Set loading state
       const loadingId = Date.now();
       let loadingContent = 'Thinking...';
@@ -890,7 +1266,8 @@ export default {
         body: JSON.stringify({
           prompt: userMessage,
           provider: 'auto', // Use auto to let the backend choose
-          model: null
+          model: null,
+          project_id: this.projectId // Pass current project ID when in Gantt view
         })
       })
       .then(response => {
@@ -988,16 +1365,25 @@ export default {
             // First pass: create task map
             data.forEach(task => {
               // Create a task object with our expected structure
+              // Map from server fields (snake_case) to client fields (camelCase)
+              // Map old status values to new ones
+              let mappedStatus = task.status;
+              if (task.status === 'not_started') mappedStatus = 'todo';
+              if (task.status === 'in_progress') mappedStatus = 'inProgress';
+              if (task.status === 'on_hold') mappedStatus = 'backlog';
+              if (task.status === 'completed') mappedStatus = 'done';
+              if (task.status === 'cancelled') mappedStatus = 'backlog';
+              
               const taskObj = {
                 id: task.id,
                 name: task.name,
                 description: task.description,
                 startDate: new Date(task.start_date),
-                endDate: new Date(task.due_date),
-                progress: task.percent_complete || 0,
+                endDate: new Date(task.due_date),  // Map from due_date to endDate
+                progress: task.percent_complete || 0,  // Map from percent_complete to progress
                 expanded: true,
                 resources: task.assignee_id ? [task.assignee_id] : [],
-                status: task.status,
+                status: mappedStatus,
                 children: []
               };
               
@@ -1117,7 +1503,7 @@ export default {
       const msgLower = message.toLowerCase();
       
       // Check for task creation patterns
-      const taskKeywords = ['task', 'project', 'plan', 'schedule', 'gantt', 'timeline'];
+      const taskKeywords = ['task', 'project', 'plan', 'schedule', 'gantt', 'timeline', 'wbs'];
       const createKeywords = ['create', 'generate', 'make', 'build', 'develop', 'setup'];
       
       // Check if at least one word from each category is in the message
@@ -1125,6 +1511,123 @@ export default {
       const hasCreateKeyword = createKeywords.some(word => msgLower.includes(word));
       
       return hasTaskKeyword && hasCreateKeyword;
+    },
+    
+    // Check if current project has tasks
+    projectHasTasks() {
+      return this.tasks && this.tasks.length > 0;
+    },
+    
+    // Task creation confirmation methods
+    confirmTaskCreation(mode) {
+      // Store the selected mode (append or replace)
+      this.taskCreationMode = mode;
+      
+      // Hide the modal
+      this.showTaskCreationConfirmModal = false;
+      
+      // Add user message to chat
+      this.aiChatMessages.push({
+        sender: 'user',
+        content: this.pendingTaskCreationMessage
+      });
+      
+      // Set loading state
+      const loadingId = Date.now();
+      const loadingMessage = {
+        id: loadingId,
+        sender: 'ai',
+        content: 'Creating your project plan... This may take a minute.',
+        loading: true
+      };
+      this.aiChatMessages.push(loadingMessage);
+      
+      // Scroll to bottom
+      this.$nextTick(() => {
+        const messagesContainer = document.querySelector('.ai-chat-messages');
+        if (messagesContainer) {
+          messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+      });
+      
+      // Send request with the selected mode
+      fetch('/api/v1/ai_chat/message', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
+        },
+        body: JSON.stringify({
+          prompt: this.pendingTaskCreationMessage,
+          provider: 'auto',
+          model: null,
+          project_id: this.projectId,
+          task_mode: this.taskCreationMode // Add the mode to the request
+        })
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Server responded with ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+      })
+      .then(data => {
+        // Remove loading message
+        const index = this.aiChatMessages.findIndex(m => m.id === loadingId);
+        if (index !== -1) {
+          this.aiChatMessages.splice(index, 1);
+        }
+        
+        // Add AI response to messages
+        this.aiChatMessages.push({
+          sender: 'ai',
+          content: data.response,
+          provider: data.provider,
+          model: data.model,
+          action: data.action
+        });
+        
+        // Check if we need to refresh the tasks/gantt chart
+        if (data.action === 'refresh_tasks') {
+          console.log('Refreshing tasks after AI task creation');
+          // Force refresh after a short delay to ensure backend has completed transaction
+          setTimeout(() => {
+            this.fetchTasksFromServer();
+          }, 500); // 500ms delay
+        }
+        
+        // Scroll to bottom after receiving response
+        this.$nextTick(() => {
+          const messagesContainer = document.querySelector('.ai-chat-messages');
+          if (messagesContainer) {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+          }
+        });
+      })
+      .catch(error => {
+        console.error('Error sending message to AI:', error);
+        
+        // Remove loading message
+        const index = this.aiChatMessages.findIndex(m => m.id === loadingId);
+        if (index !== -1) {
+          this.aiChatMessages.splice(index, 1);
+        }
+        
+        // Add error message
+        this.aiChatMessages.push({
+          sender: 'ai',
+          content: 'Sorry, there was an error processing your request. Please try again later.',
+          error: true
+        });
+      });
+      
+      // Reset pending message
+      this.pendingTaskCreationMessage = '';
+    },
+    
+    cancelTaskCreation() {
+      this.showTaskCreationConfirmModal = false;
+      this.pendingTaskCreationMessage = '';
     },
     
     // Resource Management
@@ -2322,6 +2825,16 @@ body.resizing .ai-chat-panel {
   color: #888;
   margin-top: 4px;
   font-style: italic;
+}
+
+.btn-primary {
+  padding: 8px 16px;
+  background-color: #6699CC;
+  color: white;
+  border: 1px solid #5588BB;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
 }
 
 .btn-danger {

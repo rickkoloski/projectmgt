@@ -23,7 +23,7 @@ module Api
       
       # POST /api/v1/tasks
       def create
-        @task = Task.new(task_params)
+        @task = Task.new(prepare_task_params)
         
         if @task.save
           render json: @task, status: :created
@@ -54,9 +54,9 @@ module Api
                 name: task_data[:name],
                 description: task_data[:description],
                 start_date: task_data[:start_date],
-                end_date: task_data[:end_date],
+                due_date: task_data[:end_date],
                 status: task_data[:status] || 'todo',
-                progress: task_data[:progress] || 0,
+                percent_complete: task_data[:progress] || 0,
                 project_id: task_data[:project_id],
                 parent_id: task_data[:parent_id],
                 creator_id: current_user&.id || 1,
@@ -83,15 +83,59 @@ module Api
         end
       end
       
-      # Other standard CRUD actions (show, update, destroy) go here...
+      # GET /api/v1/tasks/:id
+      def show
+        @task = Task.find(params[:id])
+        render json: @task
+      end
+      
+      # PATCH/PUT /api/v1/tasks/:id
+      def update
+        @task = Task.find(params[:id])
+        
+        if @task.update(prepare_task_params)
+          render json: @task
+        else
+          render json: { errors: @task.errors.full_messages }, status: :unprocessable_entity
+        end
+      end
+      
+      # DELETE /api/v1/tasks/:id
+      def destroy
+        @task = Task.find(params[:id])
+        
+        if @task.destroy
+          render json: { success: true }
+        else
+          render json: { errors: @task.errors.full_messages }, status: :unprocessable_entity
+        end
+      end
       
       private
       
       def task_params
         params.require(:task).permit(
-          :name, :description, :start_date, :end_date, 
-          :status, :progress, :project_id, :parent_id, :assignee_id
+          :name, :description, :start_date, :due_date, 
+          :status, :percent_complete, :project_id, :parent_id, :assignee_id,
+          :progress
         )
+      end
+      
+      # Map front-end parameters to database fields
+      def prepare_task_params
+        task_attributes = task_params
+        
+        # Map progress to percent_complete if it exists
+        if task_attributes[:progress].present?
+          task_attributes[:percent_complete] = task_attributes.delete(:progress)
+        end
+        
+        # Ensure endDate maps to due_date
+        if params[:task][:endDate].present?
+          task_attributes[:due_date] = params[:task][:endDate]
+        end
+        
+        task_attributes
       end
     end
   end

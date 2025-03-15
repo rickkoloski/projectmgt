@@ -109,8 +109,20 @@ export default {
         'todo': 'To Do',
         'inProgress': 'In Progress',
         'review': 'Review',
-        'done': 'Done'
+        'done': 'Done',
+        // Legacy mappings
+        'not_started': 'To Do',
+        'in_progress': 'In Progress',
+        'on_hold': 'Backlog',
+        'completed': 'Done',
+        'cancelled': 'Backlog'
       };
+      
+      // Log the actual status value for debugging
+      if (!statusLabels[this.task.status]) {
+        console.log(`Unknown status value: "${this.task.status}" in task:`, this.task);
+      }
+      
       return statusLabels[this.task.status] || 'Unknown';
     }
   },
@@ -149,6 +161,7 @@ export default {
     updateStatus(event) {
       const status = event.target.value;
       const updatedTask = { ...this.task, status };
+      console.log('Updating task status in TaskCard:', { oldStatus: this.task.status, newStatus: status });
       this.$emit('update:task', updatedTask);
     },
     
