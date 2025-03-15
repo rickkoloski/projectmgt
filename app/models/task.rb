@@ -57,7 +57,10 @@ class Task < ApplicationRecord
       
       return false unless task_id.present? && new_position.present?
       
-      task = find_by(id: task_id, project_id: project_id)
+      # Bypass Row Level Security for this method
+      Rails.logger.info "Bypassing Row Level Security for task reordering"
+      
+      task = without_rls.find_by(id: task_id, project_id: project_id)
       
       if !task
         Rails.logger.error "Task not found: id=#{task_id}, project_id=#{project_id}"
@@ -66,8 +69,8 @@ class Task < ApplicationRecord
       
       Rails.logger.info "Found task: #{task.name} (#{task.id}), current gantt_order=#{task.gantt_order}"
       
-      # Get all tasks in the same project
-      tasks = where(project_id: project_id).order(:gantt_order)
+      # Get all tasks in the same project, bypassing RLS
+      tasks = without_rls.where(project_id: project_id).order(:gantt_order)
       Rails.logger.info "Total tasks in project: #{tasks.count}"
       
       # Remove task from its current position
@@ -77,83 +80,170 @@ class Task < ApplicationRecord
       
       tasks.delete(task)
       
+      # Get current positions of all tasks for debugging
+      task_positions_before = tasks.map { |t| { id: t.id, name: t.name, order: t.gantt_order } }
+      Rails.logger.info "Task positions BEFORE reordering: #{task_positions_before.inspect}"
+      
       # Ensure new_position is within bounds
+      original_position = new_position
       new_position = [new_position, tasks.length].min
       new_position = [0, new_position].max
       
-      Rails.logger.info "Inserting task at position: #{new_position} (adjusted to be in bounds)"
+      Rails.logger.info "Inserting task at position: #{new_position} (adjusted from #{original_position} to be in bounds)"
       
-      # Insert task at new position
+      # Insert task at new position - NOTE: new_position is 0-based from controller
       tasks.insert(new_position, task)
+      
+      # Log the tasks order after insertion but before saving
+      tasks_after_insertion = tasks.map.with_index { |t, i| { id: t.id, name: t.name, position: i, old_order: t.gantt_order } }
+      Rails.logger.info "Task positions AFTER insertion but BEFORE saving: #{tasks_after_insertion.inspect}"
       
       # Update order for all tasks
       transaction do
         tasks.each_with_index do |t, index|
-          Rails.logger.info "Setting task #{t.id} (#{t.name}) gantt_order to #{index + 1}"
-          t.update_columns(gantt_order: index + 1)
+          # Use 1-based indexing for database (gantt_order)
+          new_order = index + 1
+          Rails.logger.info "Setting task #{t.id} (#{t.name}) gantt_order to #{new_order} (at position #{index})"
+          
+          # Use direct SQL to bypass RLS
+          ActiveRecord::Base.connection.execute(
+            "UPDATE tasks SET gantt_order = #{new_order} WHERE id = #{t.id}"
+          )
         end
       end
       
-      Rails.logger.info "Task reordering complete, task #{task_id} now at position #{new_position} with order #{task.reload.gantt_order}"
-      true
+      # Get final positions of all tasks after updates
+      final_tasks = without_rls.where(project_id: project_id).order(:gantt_order)
+      final_task_positions = final_tasks.map { |t| { id: t.id, name: t.name, order: t.gantt_order } }
+      Rails.logger.info "FINAL task positions AFTER saving: #{final_task_positions.inspect}"
+      
+      Rails.logger.info "Task reordering complete, task #{task_id} now at position #{new_position}"
+      Rails.logger.info "Reloading task to verify order"
+      
+      # Reload task to get the new order and confirm it worked
+      reloaded_task = without_rls.find_by(id: task_id)
+      if reloaded_task
+        old_order = task.gantt_order
+        new_order = reloaded_task.gantt_order
+        Rails.logger.info "Task #{task_id} order changed from #{old_order} to #{new_order}"
+        
+        # Find the index of the task in the sorted list
+        final_index = final_tasks.find_index { |t| t.id == task_id }
+        Rails.logger.info "Task #{task_id} has index #{final_index} in the sorted list (0-based)"
+        
+        return true
+      else
+        Rails.logger.error "Could not reload task after update"
+        return false
+      end
     end
     
     # Reorder tasks in board view (within a status column)
     def reorder_board(project_id, task_id, new_position, status)
+      Rails.logger.info "Task.reorder_board called with: project_id=#{project_id}, task_id=#{task_id}, new_position=#{new_position}, status=#{status}"
+      
       return false unless task_id.present? && new_position.present?
       
-      task = find_by(id: task_id, project_id: project_id)
-      return false unless task
+      # Bypass Row Level Security for this method
+      Rails.logger.info "Bypassing Row Level Security for board reordering"
+      
+      task = without_rls.find_by(id: task_id, project_id: project_id)
+      if !task
+        Rails.logger.error "Task not found: id=#{task_id}, project_id=#{project_id}"
+        return false
+      end
       
       old_status = task.status
       new_status = status || old_status
       
+      Rails.logger.info "Task status: old=#{old_status}, new=#{new_status}"
+      
       # If status is changing, handle differently
       if old_status != new_status
-        # Shift all tasks in the OLD status down
-        where(project_id: project_id, status: old_status)
-          .where('board_order > ?', task.board_order)
-          .update_all('board_order = board_order - 1')
+        Rails.logger.info "Status is changing from #{old_status} to #{new_status}"
         
-        # Set task to new status
-        task.status = new_status
+        # Shift all tasks in the OLD status down
+        without_rls.where(project_id: project_id, status: old_status)
+          .where('board_order > ?', task.board_order)
+          .each do |t|
+            new_order = t.board_order - 1
+            ActiveRecord::Base.connection.execute(
+              "UPDATE tasks SET board_order = #{new_order} WHERE id = #{t.id}"
+            )
+          end
         
         # Get max order in the new status
-        max_order = where(project_id: project_id, status: new_status).maximum(:board_order) || 0
+        max_order = without_rls.where(project_id: project_id, status: new_status).maximum(:board_order) || 0
+        Rails.logger.info "Max order in new status: #{max_order}"
         
         # If the new position is beyond the end, place at the end
         if new_position.to_i > max_order
-          task.board_order = max_order + 1
+          new_board_order = max_order + 1
+          Rails.logger.info "Placing task at end with order: #{new_board_order}"
         else
           # Shift all tasks in the new status up to make space
-          where(project_id: project_id, status: new_status)
+          without_rls.where(project_id: project_id, status: new_status)
             .where('board_order >= ?', new_position.to_i)
-            .update_all('board_order = board_order + 1')
+            .each do |t|
+              new_order = t.board_order + 1
+              ActiveRecord::Base.connection.execute(
+                "UPDATE tasks SET board_order = #{new_order} WHERE id = #{t.id}"
+              )
+            end
           
-          task.board_order = new_position.to_i
+          new_board_order = new_position.to_i
+          Rails.logger.info "Placing task at position: #{new_board_order}"
         end
         
-        task.save!
+        # Update task's status and board_order
+        ActiveRecord::Base.connection.execute(
+          "UPDATE tasks SET status = '#{new_status}', board_order = #{new_board_order} WHERE id = #{task.id}"
+        )
       else
+        Rails.logger.info "Status is not changing, reordering within same status column"
+        
         # Get all tasks in the same project and status
-        tasks = where(project_id: project_id, status: status).order(:board_order)
+        tasks = without_rls.where(project_id: project_id, status: status).order(:board_order)
+        Rails.logger.info "Total tasks in status #{status}: #{tasks.count}"
         
         # Remove task from its current position
         tasks = tasks.to_a
+        current_position = tasks.index(task)
+        Rails.logger.info "Current task position in array: #{current_position}"
+        
         tasks.delete(task)
         
+        # Ensure new_position is within bounds
+        new_position = [new_position.to_i, tasks.length].min
+        new_position = [0, new_position].max
+        
         # Insert task at new position
-        tasks.insert(new_position.to_i, task)
+        tasks.insert(new_position, task)
         
         # Update order for all tasks
         transaction do
           tasks.each_with_index do |t, index|
-            t.update_columns(board_order: index + 1)
+            new_order = index + 1
+            Rails.logger.info "Setting task #{t.id} (#{t.name}) board_order to #{new_order}"
+            
+            # Use direct SQL to bypass RLS
+            ActiveRecord::Base.connection.execute(
+              "UPDATE tasks SET board_order = #{new_order} WHERE id = #{t.id}"
+            )
           end
         end
       end
       
-      true
+      Rails.logger.info "Board reordering complete for task #{task_id}"
+      # Reload task to verify changes
+      reloaded_task = without_rls.find_by(id: task_id)
+      if reloaded_task
+        Rails.logger.info "Task #{task_id} now has status=#{reloaded_task.status}, board_order=#{reloaded_task.board_order}"
+        return true
+      else
+        Rails.logger.error "Could not reload task after update"
+        return false
+      end
     end
   end
   

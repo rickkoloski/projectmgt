@@ -98,28 +98,73 @@ export default {
         
         // Calculate positions based on task data
         const dayWidth = 24 * this.zoomLevel;
+        const rowHeight = 36;
         
-        // From task position
-        const fromStartDate = new Date(fromTask.startDate);
-        const fromEndDate = new Date(fromTask.endDate);
-        const fromDaysDiff = Math.floor((fromStartDate - this.startDate) / (1000 * 60 * 60 * 24));
-        const fromDuration = Math.ceil((fromEndDate - fromStartDate) / (1000 * 60 * 60 * 24)) + 1;
+        // Helper function to safely create a date
+        const safeDate = (dateString) => {
+          if (!dateString) return new Date(); // Default to today if missing
+          
+          try {
+            const date = new Date(dateString);
+            // Check if the date is valid
+            if (isNaN(date.getTime())) {
+              console.warn(`Invalid date: ${dateString}, using today's date`);
+              return new Date();
+            }
+            return date;
+          } catch (e) {
+            console.warn(`Error parsing date: ${dateString}`, e);
+            return new Date();
+          }
+        };
+        
+        // Helper function to safely calculate days difference
+        const safeDaysDiff = (date1, date2) => {
+          try {
+            return Math.floor((date1 - date2) / (1000 * 60 * 60 * 24));
+          } catch (e) {
+            console.warn('Error calculating days difference:', e);
+            return 0;
+          }
+        };
+        
+        // From task position - with error handling
+        const fromStartDate = safeDate(fromTask.startDate);
+        const fromEndDate = safeDate(fromTask.endDate || fromTask.dueDate || fromTask.startDate);
+        const fromDaysDiff = safeDaysDiff(fromStartDate, this.startDate);
+        
+        // Make sure fromDuration is at least 1 day
+        let fromDuration;
+        try {
+          fromDuration = Math.max(1, Math.ceil((fromEndDate - fromStartDate) / (1000 * 60 * 60 * 24)) + 1);
+        } catch (e) {
+          console.warn('Error calculating duration:', e);
+          fromDuration = 1;
+        }
+        
         const fromLeft = fromDaysDiff * dayWidth;
         const fromWidth = fromDuration * dayWidth;
         const fromRowIndex = typeof fromTask.rowIndex === 'number' ? fromTask.rowIndex : 0;
-        // Apply vertical positioning correction (adding 54px = 1.5 * rowHeight)
-        const verticalOffset = 54; // 1.5 * rowHeight(36)
-        const fromTop = (36 * fromRowIndex + 15) + verticalOffset; // center vertically + offset
+        const fromTop = (rowHeight * fromRowIndex) + (rowHeight / 2); // center vertically in the row
         
-        // To task position
-        const toStartDate = new Date(toTask.startDate);
-        const toEndDate = new Date(toTask.endDate);
-        const toDaysDiff = Math.floor((toStartDate - this.startDate) / (1000 * 60 * 60 * 24));
-        const toDuration = Math.ceil((toEndDate - toStartDate) / (1000 * 60 * 60 * 24)) + 1;
+        // To task position - with error handling
+        const toStartDate = safeDate(toTask.startDate);
+        const toEndDate = safeDate(toTask.endDate || toTask.dueDate || toTask.startDate);
+        const toDaysDiff = safeDaysDiff(toStartDate, this.startDate);
+        
+        // Make sure toDuration is at least 1 day
+        let toDuration;
+        try {
+          toDuration = Math.max(1, Math.ceil((toEndDate - toStartDate) / (1000 * 60 * 60 * 24)) + 1);
+        } catch (e) {
+          console.warn('Error calculating duration:', e);
+          toDuration = 1;
+        }
+        
         const toLeft = toDaysDiff * dayWidth;
         const toWidth = toDuration * dayWidth;
         const toRowIndex = typeof toTask.rowIndex === 'number' ? toTask.rowIndex : 0;
-        const toTop = (36 * toRowIndex + 15) + verticalOffset; // center vertically + offset
+        const toTop = (rowHeight * toRowIndex) + (rowHeight / 2); // center vertically in the row
         
         // Determine connection points based on dependency type
         let startX, startY, endX, endY;
@@ -140,37 +185,82 @@ export default {
           endY = toTop;
         }
         
-        // Create the path with improved routing for closely positioned tasks
+        // Create the path with consistent S-shaped routing
         let path;
         
-        // Calculate horizontal distance between points
-        const horizontalDistance = Math.abs(endX - startX);
-        const minSeparationForStandardPath = 40; // minimum pixels for standard path
+        // We need to create a path that:
+        // 1. Exits the source task in a logical direction based on dependency type
+        // 2. Routes in an S shape through open space
+        // 3. Enters the target task from a logical direction
         
-        if (horizontalDistance < minSeparationForStandardPath) {
-          // Use an "S" shaped path for closely positioned tasks
-          // This is the MS Project style orthogonal "S" routing
-          const extendRight = 20; // How far to extend right from start point
-          const backOffset = 10; // How far to go back from the target point
-          
-          // We need to be precise about the midpoint position
-          // Explicitly calculate the position between task bars
-          // The row height is 36px, and the space we want is between the task bars
-          
-          // Position the middle segment exactly 2.5px above the midpoint
-          // This small adjustment should place it perfectly in the whitespace
-          const verticalMidPoint = (startY + endY) / 2 - 2.5;
-          
+        // Constants for path generation
+        const extendRight = 20; // Extension from start point
+        const backOffset = 10; // Offset from end point
+        const verticalMidPoint = (startY + endY) / 2; // Middle point between tasks
+        
+        // Determine if we're dealing with a finish-to-start dependency (most common)
+        const isFinishToStart = dep.fromType === 'end' && dep.toType === 'start';
+        
+        if (isFinishToStart) {
+          // For finish-to-start: always create a clean right-to-left S path
           path = `M ${startX} ${startY} 
                   H ${startX + extendRight} 
                   V ${verticalMidPoint} 
                   H ${endX - backOffset} 
                   V ${endY} 
                   H ${endX}`;
+        } else if (dep.fromType === 'end' && dep.toType === 'end') {
+          // For finish-to-finish: exit right, enter left
+          path = `M ${startX} ${startY} 
+                  H ${startX + extendRight} 
+                  V ${verticalMidPoint} 
+                  H ${toLeft - backOffset} 
+                  V ${endY} 
+                  H ${endX}`;
+        } else if (dep.fromType === 'start' && dep.toType === 'start') {
+          // For start-to-start: exit right from start point, enter left
+          // This ensures we don't cross over task bars
+          const fromRightSide = fromLeft + fromWidth;
+          path = `M ${startX} ${startY} 
+                  H ${fromRightSide + 10} 
+                  V ${fromTop - 15} 
+                  H ${endX - backOffset * 2} 
+                  V ${endY} 
+                  H ${endX}`;
+        } else if (dep.fromType === 'start' && dep.toType === 'end') {
+          // For start-to-finish: exit right from start point, enter left
+          const fromRightSide = fromLeft + fromWidth;
+          path = `M ${startX} ${startY} 
+                  H ${fromRightSide + 10} 
+                  V ${fromTop - 15} 
+                  H ${toLeft - backOffset} 
+                  V ${endY} 
+                  H ${endX}`;
         } else {
-          // Standard path for normally separated tasks
-          const midX = (startX + endX) / 2;
-          path = `M ${startX} ${startY} H ${midX} V ${endY} H ${endX}`;
+          // Default fallback path for any unforeseen combinations
+          // Use the same pattern as finish-to-start as it's most common
+          console.warn('Unknown dependency type combination:', dep.fromType, dep.toType);
+          path = `M ${startX} ${startY} 
+                  H ${startX + extendRight} 
+                  V ${verticalMidPoint} 
+                  H ${endX - backOffset} 
+                  V ${endY} 
+                  H ${endX}`;
+        }
+        
+        // Validate that all coordinates are valid numbers before returning
+        if (isNaN(startX) || isNaN(startY) || isNaN(endX) || isNaN(endY)) {
+          console.warn('Invalid coordinates detected for dependency:', {
+            from: dep.from,
+            to: dep.to,
+            startX,
+            startY,
+            endX,
+            endY
+          });
+          
+          // Return null so this dependency is filtered out
+          return null;
         }
         
         return {
@@ -209,14 +299,15 @@ export default {
   width: 100%;
   height: 100%;
   pointer-events: none; /* Keep as 'none' to allow clicks to pass through to task bars */
-  z-index: 5; /* Keep as low as possible, same as task bars */
+  z-index: 5;
+  overflow: visible; /* Ensure lines aren't cut off */
 }
 
 .dependency-path {
   fill: none;
-  stroke: rgba(74, 144, 226, 0.7); /* Slightly transparent blue */
+  stroke: rgba(74, 144, 226, 0.8); /* Match connection point color */
   stroke-width: 2px;
-  stroke-dasharray: 4 3; /* Slightly wider gaps */
+  stroke-dasharray: 4 3;
   pointer-events: stroke; /* Make only the stroke of the line clickable */
   cursor: pointer;
   stroke-linecap: round; /* Makes the line easier to click */

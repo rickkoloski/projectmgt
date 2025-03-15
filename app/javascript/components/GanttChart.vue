@@ -143,16 +143,30 @@
             <h4>Drop Operation Details</h4>
             <p><strong>Dragged Task ID:</strong> {{ lastDraggedTaskId }}</p>
             <p><strong>Original Position:</strong> {{ lastDragOriginalPosition }}</p>
-            <p><strong>Drop Position:</strong> {{ lastDropPosition }}</p>
+            <p><strong>Drop Position:</strong> {{ lastDropPosition }} (Client-side)</p>
             <p><strong>Adjusted Position:</strong> {{ lastDropPosition + 1 }} (for backend)</p>
           </div>
           <div class="debug-section">
-            <h4>Task List Order</h4>
+            <h4>Task List Before Server Update</h4>
             <div class="task-list-preview">
               <div v-for="(task, index) in debugTasks" :key="task.id" 
                   :class="['task-item-preview', {
                     'original-position': task.id === lastDraggedTaskId && index === lastDragOriginalPosition,
                     'new-position': task.id === lastDraggedTaskId && index === lastDropPosition,
+                    'dragged-task': task.id === lastDraggedTaskId
+                  }]">
+                <span class="task-index">{{ index }}</span>
+                <span class="task-id">[ID: {{ task.id }}]</span>
+                <span class="task-name">{{ task.name }}</span>
+                <span class="task-order">(Order: {{ task.gantt_order }})</span>
+              </div>
+            </div>
+          </div>
+          <div class="debug-section">
+            <h4>Task List After Server Update</h4>
+            <div class="task-list-preview">
+              <div v-for="(task, index) in tasks" :key="task.id + '-server'" 
+                  :class="['task-item-preview', {
                     'dragged-task': task.id === lastDraggedTaskId
                   }]">
                 <span class="task-index">{{ index }}</span>
@@ -199,6 +213,10 @@ export default {
     selectedDependencyIndex: {
       type: Number,
       default: -1
+    },
+    projectId: {
+      type: Number,
+      default: null
     }
   },
   data() {
@@ -280,6 +298,9 @@ export default {
     
     // Set initial sidebar width based on visible columns
     this.adjustSidebarWidth();
+    
+    // Ensure we have a project ID by collecting it from all possible sources
+    this.ensureProjectId();
     
     // Add window resize event listener
     window.addEventListener('resize', this.handleResize);
@@ -929,7 +950,20 @@ export default {
     prepareDebugTasks(taskId, newPosition) {
       console.log("Preparing debug tasks for modal");
       
-      // Create a deep copy of the tasks array
+      // Create a deep copy of the tasks array for the initial state
+      const initialTasks = JSON.parse(JSON.stringify(this.tasks));
+      
+      // Log the initial state of tasks
+      console.log("Initial task order before reordering:", 
+        initialTasks.map((t, idx) => ({
+          id: t.id, 
+          name: t.name, 
+          order: t.gantt_order,
+          idx: idx
+        }))
+      );
+      
+      // Create a deep copy of the tasks array for reordering
       const tasksToReorder = JSON.parse(JSON.stringify(this.tasks));
       
       // Find the task's current position
@@ -939,59 +973,87 @@ export default {
         return;
       }
       
+      console.log(`Task ${taskId} found at index ${taskIndex} with order ${tasksToReorder[taskIndex].gantt_order}`);
+      console.log(`Moving to new position ${newPosition}`);
+      
       // Remove the task from its current position
       const [removedTask] = tasksToReorder.splice(taskIndex, 1);
       
       // Insert the task at the new position
       tasksToReorder.splice(newPosition, 0, removedTask);
       
+      // Log the state after reordering but before updating gantt_order
+      console.log("Task order after reordering but before updating gantt_order:", 
+        tasksToReorder.map((t, idx) => ({
+          id: t.id, 
+          name: t.name, 
+          order: t.gantt_order,
+          idx: idx
+        }))
+      );
+      
       // Update the gantt_order property on all tasks
       tasksToReorder.forEach((task, index) => {
-        task.gantt_order = index + 1; // Store as 1-based
+        const newOrder = index + 1; // Store as 1-based
+        console.log(`Setting task ${task.id} gantt_order from ${task.gantt_order} to ${newOrder}`);
+        task.gantt_order = newOrder;
       });
+      
+      // Log the final expected state
+      console.log("Final expected task order after reordering:", 
+        tasksToReorder.map((t, idx) => ({
+          id: t.id, 
+          name: t.name, 
+          order: t.gantt_order,
+          idx: idx
+        }))
+      );
       
       // Store the reordered tasks for the debug modal
       this.debugTasks = tasksToReorder;
     },
     
+    // Handle closing the debug modal and updating the UI
     closeDebugModal() {
+      // Before closing, log the difference between client and server states
+      const clientTaskOrder = this.debugTasks.map(t => ({ id: t.id, name: t.name, order: t.gantt_order }));
+      const serverTaskOrder = this.tasks.map(t => ({ id: t.id, name: t.name, order: t.gantt_order }));
+      
+      console.log('=== COMPARING CLIENT VS SERVER STATES ===');
+      console.log('Client-side task order:', clientTaskOrder);
+      console.log('Server-side task order:', serverTaskOrder);
+      
+      // Find the dragged task position in each list
+      const clientDraggedIndex = this.debugTasks.findIndex(t => t.id === this.lastDraggedTaskId);
+      const serverDraggedIndex = this.tasks.findIndex(t => t.id === this.lastDraggedTaskId);
+      
+      if (clientDraggedIndex !== -1 && serverDraggedIndex !== -1) {
+        console.log(`Dragged task ${this.lastDraggedTaskId} position: client=${clientDraggedIndex}, server=${serverDraggedIndex}`);
+        console.log(`Position difference: ${serverDraggedIndex - clientDraggedIndex} (positive means server placed it lower)`);
+      }
+      
+      // Close the modal
       this.showDebugModal = false;
       
-      // Verify tasks are in the reordered state as shown in the debug modal
-      console.log('Verifying task order after closing debug modal:', 
-        this.tasks.map(t => ({id: t.id, name: t.name, order: t.gantt_order}))
-      );
+      // No need to update from debug tasks since we have server response
+      console.log('Keeping server-provided task order as the source of truth.');
       
-      // Force a UI refresh to ensure the task list reflects the reordering
-      this.$nextTick(() => {
-        console.log('Forcing UI update after debug modal closure');
-        
-        // Update from the debug tasks
-        this.updateTasksFromServerResponse(this.debugTasks);
-        
-        // Explicitly notify parent (App.vue) to refresh its task list
-        this.$emit('tasks-reordered', this.debugTasks);
-        
-        // Force a re-render
-        this.$forceUpdate();
-        
-        // Schedule another update to ensure changes propagate
-        setTimeout(() => {
-          console.log('Final task list verification:', 
-            this.tasks.map(t => ({id: t.id, name: t.name, order: t.gantt_order}))
-          );
-          this.$forceUpdate();
-        }, 100);
-      });
+      // Force a re-render to ensure the UI is up-to-date
+      this.$forceUpdate();
     },
     
     // Task vertical reordering functionality
     setupTaskReordering() {
       if (!this.$refs.taskList) return;
       
-      // Get project ID from the first task
-      if (this.tasks && this.tasks.length > 0) {
-        this.currentProjectId = this.tasks[0].project_id;
+      // Ensure we have a project ID if it wasn't already set
+      if (!this.currentProjectId) {
+        this.ensureProjectId();
+        
+        // If we still don't have a project ID, log a warning
+        if (!this.currentProjectId) {
+          console.warn("WARNING: No project ID available after setupTaskReordering - drag and drop may not work correctly");
+        }
       }
       
       // Use event delegation for drag events
@@ -1220,67 +1282,207 @@ export default {
       // Store task ID before resetting drag state
       const taskId = this.draggedTaskId;
       
-      // Save debug info before resetting state
+      // For debugging (though modal is hidden)
       this.lastDraggedTaskId = taskId;
       this.lastDragOriginalPosition = originalIndex;
       this.lastDropPosition = newPosition;
       
-      // Create deep copy of tasks for debug modal
-      this.prepareDebugTasks(taskId, newPosition);
-      
       // Reset drag state
       this.onDragEnd();
       
-      // Show debug modal
+      // Deep copy of tasks for debug modal
+      this.prepareDebugTasks(taskId, newPosition);
+      
+      // Check for special case where dragging down by 1 position
+      // This is where we often see the "jumping" issue
+      let clientPosition = newPosition;
+      if (originalIndex < newPosition) {
+        console.log("Dragging downward: original=" + originalIndex + ", new=" + newPosition);
+        
+        // In downward drags, the position is accurate for UI since the
+        // element being dragged has already been removed from the DOM flow
+      } else {
+        console.log("Dragging upward or to same position: original=" + originalIndex + ", new=" + newPosition);
+        // In upward drags, the position is correct (no adjustment needed)
+      }
+      
+      console.log(`Adjusted position for optimistic update: ${clientPosition}`);
+      
+      // Apply optimistic update to UI using the client-side position
+      this.updateLocalTaskOrder(taskId, clientPosition);
+      
+      // Show the debug modal
       this.showDebugModal = true;
       
-      // Reorder task
-      console.log(`Final determination: Reordering task ${taskId} to position ${newPosition}`);
-      this.reorderTask(taskId, newPosition);
+      // Reorder task on the server - passing current position for debugging
+      console.log(`Final determination: Reordering task ${taskId} to position ${newPosition} from original ${originalIndex}`);
+      
+      // Use the exact client position - the server will handle the indexing adjustments
+      this.reorderTask(taskId, newPosition, originalIndex);
+    },
+    
+    // Helper method to ensure we have a project ID from any available source
+    ensureProjectId() {
+      // First check props
+      if (this.projectId) {
+        this.currentProjectId = this.projectId;
+        console.log(`Set currentProjectId from prop: ${this.currentProjectId}`);
+        return;
+      }
+      
+      // Check the DOM data attribute
+      const appElement = document.getElementById('main-app');
+      const dataProjectId = appElement?.dataset?.projectId;
+      if (dataProjectId) {
+        this.currentProjectId = parseInt(dataProjectId);
+        console.log(`Set currentProjectId from DOM attribute: ${this.currentProjectId}`);
+        return;
+      }
+      
+      // Check window.initialData
+      if (window.initialData && window.initialData.projects && window.initialData.projects.length > 0) {
+        this.currentProjectId = window.initialData.projects[0].id;
+        console.log(`Set currentProjectId from initialData: ${this.currentProjectId}`);
+        return;
+      }
+      
+      // Check tasks if available
+      if (this.tasks && this.tasks.length > 0) {
+        // Try to find a task with a project
+        for (const task of this.tasks) {
+          if (task.project?.id) {
+            this.currentProjectId = task.project.id;
+            console.log(`Set currentProjectId from task.project.id: ${this.currentProjectId}`);
+            return;
+          } else if (task.project_id) {
+            this.currentProjectId = task.project_id;
+            console.log(`Set currentProjectId from task.project_id: ${this.currentProjectId}`);
+            return;
+          }
+        }
+      }
+      
+      console.warn("Could not find a valid project ID from any source");
     },
     
     // Call the API to reorder the task
-    reorderTask(taskId, newPosition) {
-      if (!this.currentProjectId) return;
+    reorderTask(taskId, newPosition, originalPosition) {
+      // IMPORTANT DEBUG: Log the state at the start of the method
+      console.log("==== TASK REORDERING DEBUG START ====");
+      console.log(`currentProjectId: ${this.currentProjectId}`);
+      console.log(`taskId: ${taskId}`);
+      console.log(`newPosition: ${newPosition}`);
+      console.log(`originalPosition: ${originalPosition}`);
+      console.log(`tasks available: ${this.tasks.length}`);
       
-      console.log(`FINAL: Reordering task ${taskId} to position ${newPosition}`);
+      // If we don't have a project ID yet, try to find one again
+      if (!this.currentProjectId) {
+        // Find the specific task being dragged to get its project_id directly
+        const taskBeingReordered = this.tasks.find(t => t.id === taskId);
+        
+        // Access nested project object if it exists
+        let taskProjectId;
+        if (taskBeingReordered) {
+          // First try to access project.id if it exists
+          if (taskBeingReordered.project && taskBeingReordered.project.id) {
+            taskProjectId = taskBeingReordered.project.id;
+            console.log(`Found project.id: ${taskProjectId} in task`);
+          } 
+          // Then try project_id property
+          else if (taskBeingReordered.project_id) {
+            taskProjectId = taskBeingReordered.project_id;
+            console.log(`Found project_id: ${taskProjectId} in task`);
+          }
+        }
+        
+        // Check if the app element has a project ID data attribute
+        const appElement = document.getElementById('main-app');
+        const dataProjectId = appElement?.dataset?.projectId;
+        if (dataProjectId) {
+          console.log(`Found project ID in DOM data attribute: ${dataProjectId}`);
+        }
+        
+        // Check if we have a project ID from various sources
+        let projectIdToUse = this.currentProjectId || 
+                            taskProjectId || 
+                            dataProjectId || 
+                            (window.initialData && window.initialData.projects?.[0]?.id);
+        
+        if (!projectIdToUse) {
+          console.warn("No project ID found in primary sources, searching tasks...");
+          
+          // Last attempt - search through all tasks
+          for (const task of this.tasks) {
+            // Try all possible ways to get project ID
+            if (task.project?.id) {
+              projectIdToUse = task.project.id;
+              console.log(`Found project.id from task: ${projectIdToUse}`);
+              break;
+            } else if (task.project_id) {
+              projectIdToUse = task.project_id;
+              console.log(`Found project_id from task: ${projectIdToUse}`);
+              break;
+            }
+          }
+        }
+        
+        // Set the currentProjectId for future use
+        if (projectIdToUse && !this.currentProjectId) {
+          this.currentProjectId = projectIdToUse;
+          console.log(`Updated currentProjectId: ${this.currentProjectId}`);
+        }
+      }
+      
+      // Use the currentProjectId as our main project ID
+      let projectIdToUse = this.currentProjectId;
+      
+      // Final check - abort if no project ID
+      if (!projectIdToUse) {
+        console.error("CRITICAL ERROR: No project ID found anywhere. Cannot reorder task.");
+        return;
+      }
+      
+      console.log(`FINAL: Reordering task ${taskId} to position ${newPosition} in project ${projectIdToUse}`);
       
       const url = '/api/v1/tasks/reorder_gantt';
       const data = {
-        project_id: this.currentProjectId,
+        project_id: projectIdToUse,
         task_id: taskId,
         position: newPosition
       };
       
       // Get CSRF token from meta tag
       const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-      
-      // Debug: Log the actual data being sent
-      console.log("Making API POST request to:", url);
-      console.log("Request data:", JSON.stringify(data));
-      console.log("Request headers:", {
-        'Content-Type': 'application/json',
-        'X-CSRF-Token': csrfToken?.substring(0, 10) + '...',
-        'X-Requested-With': 'XMLHttpRequest'
-      });
+      if (!csrfToken) {
+        console.error("CSRF token not found! Cannot make API request.");
+        return;
+      }
       
       // Log the current tasks before making the API call
       console.log("Current tasks before API call:", this.tasks.map(t => ({
         id: t.id, 
         name: t.name,
-        order: t.gantt_order
+        order: t.gantt_order,
+        project_id: t.project_id
       })));
       
-      // Make the API call
+      // Debug: Log the actual data being sent
+      console.log("Making API POST request to:", url);
+      console.log("Request data:", JSON.stringify(data));
+      console.log("Using CSRF token:", csrfToken.substring(0, 10) + '...');
+      
+      // Make the API call with proper CSRF protection
+      console.log("Initiating fetch request...");
       fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-CSRF-Token': csrfToken,
-          'X-Requested-With': 'XMLHttpRequest'
+          'X-Requested-With': 'XMLHttpRequest',
+          'Accept': 'application/json'
         },
         body: JSON.stringify(data),
-        credentials: 'same-origin'
+        credentials: 'same-origin' // Important for CSRF cookies
       })
       .then(response => {
         console.log(`Server response status: ${response.status} ${response.statusText}`);
@@ -1341,10 +1543,14 @@ export default {
       .catch(error => {
         console.error('Error reordering tasks:', error);
         console.error('Stack trace:', error.stack);
+        console.error('IMPORTANT: This error indicates the request failed.');
         
         // Revert the optimistic UI update
         this.fetchTasksFromServer();
       });
+      
+      // Final debug message to confirm we reached the end of the method
+      console.log("==== TASK REORDERING DEBUG END ====");
     },
     
     // Fetch tasks from server to reset UI state if needed
@@ -1372,13 +1578,34 @@ export default {
       
       console.log('Updating tasks from server response:', serverTasks);
       
+      // Log ordering of tasks before update
+      console.log('Current tasks before server update:', this.tasks.map(t => ({
+        id: t.id,
+        name: t.name,
+        gantt_order: t.gantt_order
+      })));
+      
+      // Make sure server tasks are sorted by gantt_order
+      const sortedServerTasks = [...serverTasks].sort((a, b) => {
+        // Handle the case where tasks might not have gantt_order
+        const orderA = a.gantt_order || 0;
+        const orderB = b.gantt_order || 0;
+        return orderA - orderB;
+      });
+      
+      console.log('Server tasks sorted by gantt_order:', sortedServerTasks.map(t => ({
+        id: t.id,
+        name: t.name,
+        gantt_order: t.gantt_order
+      })));
+      
       // Clear the current tasks array
       while (this.tasks.length > 0) {
         this.tasks.pop();
       }
       
       // Add the tasks from the server in the correct order
-      serverTasks.forEach(serverTask => {
+      sortedServerTasks.forEach(serverTask => {
         this.tasks.push(serverTask);
       });
       
@@ -1391,6 +1618,11 @@ export default {
       
       // Force re-render
       this.$forceUpdate();
+      
+      // Schedule a delayed check to make sure the tasks rendered properly
+      setTimeout(() => {
+        console.log('Delayed refresh, task list is now:', this.tasks);
+      }, 100);
     },
     
     // Update the local task order immediately for smoother UX
@@ -1421,9 +1653,18 @@ export default {
       // Insert the task at the new position
       tasksToReorder.splice(newPosition, 0, removedTask);
       
-      // Update the gantt_order property on all tasks
+      // Log before updating gantt_order properties
+      console.log("Task array after reordering but before gantt_order update:", 
+        tasksToReorder.map((t, i) => ({ id: t.id, name: t.name, index: i }))
+      );
+      
+      // Update the gantt_order property on all tasks 
+      // Important: We're setting the visual order only - when the server responds,
+      // it will assign the actual DB-compatible values
       tasksToReorder.forEach((task, index) => {
-        task.gantt_order = index + 1; // Store as 1-based for database consistency
+        const newOrder = index + 1; // Use 1-based indexing to match backend
+        console.log(`Setting task ${task.id} (${task.name}) gantt_order to ${newOrder} (at visual position ${index})`);
+        task.gantt_order = newOrder;
       });
       
       console.log("Tasks reordered locally, new order:", tasksToReorder.map(t => ({ id: t.id, name: t.name, order: t.gantt_order })));
